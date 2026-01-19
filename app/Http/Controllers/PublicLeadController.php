@@ -26,7 +26,10 @@ class PublicLeadController extends Controller
             ->whereHas('offerings', function($q) {
                 $q->where('is_active', true)
                   ->whereIn('status', ['programado', 'en_curso'])
-                  ->where('start_date', '>', now()->toDateString())
+                  ->whereHas('dates', function($dateQuery) {
+                      $dateQuery->where('class_date', '>', now()->toDateString())
+                                ->where('is_cancelled', false);
+                  })
                   ->whereRaw('max_students > (SELECT COUNT(*) FROM enrollments WHERE course_offering_id = course_offerings.id AND status IN ("inscrito", "en_curso"))');
             })->get();
 
@@ -44,7 +47,10 @@ class PublicLeadController extends Controller
                 ->with(['dates'])
                 ->where('is_active', true)
                 ->whereIn('status', ['programado', 'en_curso'])
-                ->where('start_date', '>', now()->toDateString())
+                ->whereHas('dates', function($dateQuery) {
+                    $dateQuery->where('class_date', '>', now()->toDateString())
+                              ->where('is_cancelled', false);
+                })
                 ->whereRaw('max_students > (SELECT COUNT(*) FROM enrollments WHERE course_offering_id = course_offerings.id AND status IN ("inscrito", "en_curso"))')
                 ->get()
                 ->filter(function ($offering) {
