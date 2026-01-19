@@ -35,7 +35,7 @@ class SyncLeadWithKommo implements ShouldQueue
                 $result = $response->json();
                 // Guardamos los IDs que nos devuelve Kommo
                 $this->lead->updateQuietly([
-                    'kommo_id' => $result['_embedded']['leads'][0]['id'],
+                    'kommo_id' => $result['_embedded']['leads'][0]['id'] ?? null,
                     'kommo_contact_id' => $result['_embedded']['leads'][0]['_embedded']['contacts'][0]['id'] ?? null,
                     'last_synced_at' => now(),
                 ]);
