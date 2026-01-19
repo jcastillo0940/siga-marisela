@@ -86,7 +86,22 @@
                                 <span class="text-gray-600">Método:</span>
                                 <span class="font-medium text-primary-dark">{{ $payment->payment_method_label }}</span>
                             </div>
-                            @if($payment->reference_number)
+                            @if($payment->payment_method === 'multiple' && $payment->paymentMethods->isNotEmpty())
+                            <div class="col-span-2 mt-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                                <p class="text-xs font-semibold text-blue-800 mb-2">Desglose de Métodos:</p>
+                                @foreach($payment->paymentMethods as $method)
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-700">{{ $method->method_label }}:</span>
+                                    <span class="font-semibold text-primary-dark">${{ number_format($method->amount, 2) }}</span>
+                                </div>
+                                @if($method->reference_number)
+                                <div class="text-xs text-gray-600 ml-4 mb-2">
+                                    Ref: {{ $method->reference_number }}
+                                </div>
+                                @endif
+                                @endforeach
+                            </div>
+                            @elseif($payment->reference_number)
                             <div class="flex justify-between">
                                 <span class="text-gray-600">Referencia:</span>
                                 <span class="font-medium text-primary-dark">{{ $payment->reference_number }}</span>

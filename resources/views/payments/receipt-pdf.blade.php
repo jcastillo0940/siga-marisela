@@ -269,7 +269,17 @@
                     <span class="bold">{{ $payment->enrollment->courseOffering->course->name }}</span><br>
                     <span style="font-size: 8px; color: #777;">Inscripción ID: {{ $payment->enrollment->enrollment_code }}</span>
                 </td>
-                <td class="text-right">{{ $payment->payment_method_label }}</td>
+                <td class="text-right">
+                    {{ $payment->payment_method_label }}
+                    @if($payment->payment_method === 'multiple' && $payment->paymentMethods->isNotEmpty())
+                    <br><span style="font-size: 8px; color: #777;">Desglose:</span>
+                    @foreach($payment->paymentMethods as $method)
+                    <br><span style="font-size: 8px;">• {{ $method->method_label }}: B/. {{ number_format($method->amount, 2) }}</span>
+                    @endforeach
+                    @elseif($payment->reference_number)
+                    <br><span style="font-size: 8px; color: #777;">Ref: {{ $payment->reference_number }}</span>
+                    @endif
+                </td>
                 <td class="text-right">B/. {{ number_format($payment->amount, 2) }}</td>
             </tr>
         </tbody>

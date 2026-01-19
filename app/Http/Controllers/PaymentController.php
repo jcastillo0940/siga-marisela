@@ -22,7 +22,7 @@ class PaymentController extends Controller
 
     public function index(Request $request)
     {
-        $query = Payment::with(['enrollment.student', 'enrollment.courseOffering.course', 'receivedBy']);
+        $query = Payment::with(['enrollment.student', 'enrollment.courseOffering.course', 'receivedBy', 'paymentMethods']);
 
         // Filter by date range
         if ($request->filled('date_from')) {
@@ -207,7 +207,8 @@ class PaymentController extends Controller
                     'enrollment.courseOffering.course',
                     'paymentPlan',
                     'paymentSchedule',
-                    'receivedBy'
+                    'receivedBy',
+                    'paymentMethods'
                 ]);
 
                 $options = new \Dompdf\Options();
@@ -250,7 +251,8 @@ class PaymentController extends Controller
             'enrollment.courseOffering.course',
             'paymentPlan',
             'paymentSchedule',
-            'receivedBy'
+            'receivedBy',
+            'paymentMethods'
         ])->findOrFail($id);
 
         return view('payments.show', compact('payment'));
@@ -361,7 +363,8 @@ class PaymentController extends Controller
             'enrollment.courseOffering.course',
             'paymentPlan',
             'paymentSchedule',
-            'receivedBy'
+            'receivedBy',
+            'paymentMethods'
         ])->findOrFail($id);
 
         // Configurar DomPDF sin public_path
@@ -394,7 +397,8 @@ class PaymentController extends Controller
                 'enrollment.courseOffering.course',
                 'paymentPlan',
                 'paymentSchedule',
-                'receivedBy'
+                'receivedBy',
+                'paymentMethods'
             ])->findOrFail($id);
 
             // Generar PDF con configuración personalizada
