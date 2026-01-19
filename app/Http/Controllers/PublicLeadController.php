@@ -26,10 +26,8 @@ class PublicLeadController extends Controller
             ->whereHas('offerings', function($q) {
                 $q->where('is_active', true)
                   ->whereIn('status', ['programado', 'en_curso'])
-                  ->whereHas('dates', function($dateQuery) {
-                      $dateQuery->where('class_date', '>', now()->toDateString())
-                                ->where('is_cancelled', false);
-                  })
+                  // Verificar que la PRIMERA clase no cancelada sea en el futuro
+                  ->whereRaw('(SELECT MIN(class_date) FROM course_offering_dates WHERE course_offering_id = course_offerings.id AND is_cancelled = 0) > ?', [now()->toDateString()])
                   ->whereRaw('max_students > (SELECT COUNT(*) FROM enrollments WHERE course_offering_id = course_offerings.id AND status IN ("inscrito", "en_curso"))');
             })->get();
 
@@ -47,10 +45,8 @@ class PublicLeadController extends Controller
                 ->with(['dates'])
                 ->where('is_active', true)
                 ->whereIn('status', ['programado', 'en_curso'])
-                ->whereHas('dates', function($dateQuery) {
-                    $dateQuery->where('class_date', '>', now()->toDateString())
-                              ->where('is_cancelled', false);
-                })
+                // Verificar que la PRIMERA clase no cancelada sea en el futuro
+                ->whereRaw('(SELECT MIN(class_date) FROM course_offering_dates WHERE course_offering_id = course_offerings.id AND is_cancelled = 0) > ?', [now()->toDateString()])
                 ->whereRaw('max_students > (SELECT COUNT(*) FROM enrollments WHERE course_offering_id = course_offerings.id AND status IN ("inscrito", "en_curso"))')
                 ->get()
                 ->filter(function ($offering) {
@@ -103,14 +99,14 @@ class PublicLeadController extends Controller
             return back()->withInput()->with('error', 'La programación seleccionada no existe.');
         }
 
-        // Verificar que tenga clases futuras
-        $hasFutureDates = $offering->dates()
-            ->where('class_date', '>', now()->toDateString())
+        // Verificar que la PRIMERA clase no cancelada sea en el futuro (curso no ha empezado)
+        $firstClassDate = $offering->dates()
             ->where('is_cancelled', false)
-            ->exists();
+            ->orderBy('class_date')
+            ->first();
 
-        if (!$hasFutureDates) {
-            return back()->withInput()->with('error', 'Este curso ya no tiene clases programadas. Por favor selecciona otro curso.');
+        if (!$firstClassDate || $firstClassDate->class_date <= now()->toDateString()) {
+            return back()->withInput()->with('error', 'Este curso ya inició o no tiene clases programadas. Por favor selecciona otro curso.');
         }
 
         // Verificar que tenga cupos disponibles
