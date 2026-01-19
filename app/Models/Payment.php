@@ -55,6 +55,12 @@ class Payment extends Model
     {
         return $this->belongsTo(CashRegister::class);
     }
+
+    public function paymentMethods()
+    {
+        return $this->hasMany(PaymentMethod::class);
+    }
+
     // Accessors
     public function getFormattedAmountAttribute(): string
     {
@@ -69,7 +75,8 @@ class Payment extends Model
             'tarjeta_credito' => 'Tarjeta de Crédito',
             'tarjeta_debito' => 'Tarjeta de Débito',
             'yappy' => 'Yappy',
-            'otro' => 'Otro'
+            'otro' => 'Otro',
+            'multiple' => 'Múltiples Métodos'
         ];
 
         return $labels[$this->payment_method] ?? 'N/A';

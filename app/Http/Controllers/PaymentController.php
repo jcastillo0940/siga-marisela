@@ -87,9 +87,15 @@ class PaymentController extends Controller
             'enrollment_id' => 'required|exists:enrollments,id',
             'selected_schedules' => 'required|string', // JSON string with schedule IDs
             'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'required|in:efectivo,transferencia,tarjeta_credito,tarjeta_debito,yappy,otro',
+            'payment_method' => 'nullable|in:efectivo,transferencia,tarjeta_credito,tarjeta_debito,yappy,otro', // Opcional si se usan múltiples métodos
             'reference_number' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
+            // Nuevos campos para múltiples métodos de pago
+            'payment_methods' => 'nullable|array|min:1',
+            'payment_methods.*.method' => 'required|in:efectivo,transferencia,tarjeta_credito,tarjeta_debito,yappy,otro',
+            'payment_methods.*.amount' => 'required|numeric|min:0.01',
+            'payment_methods.*.reference_number' => 'nullable|string|max:255',
+            'payment_methods.*.notes' => 'nullable|string',
         ]);
 
         DB::beginTransaction();
@@ -115,6 +121,21 @@ class PaymentController extends Controller
                 throw new \Exception('Debes seleccionar al menos una cuota.');
             }
 
+            // Determinar si se usan múltiples métodos de pago
+            $useMultipleMethods = $request->has('payment_methods') && !empty($request->payment_methods);
+
+            // Validar que la suma de los métodos de pago sea igual al monto total
+            if ($useMultipleMethods) {
+                $totalMethodsAmount = collect($request->payment_methods)->sum('amount');
+
+                if (abs($totalMethodsAmount - $request->amount) > 0.01) {
+                    throw new \Exception(
+                        "La suma de los métodos de pago ($" . number_format($totalMethodsAmount, 2) . ") " .
+                        "debe ser igual al monto total ($" . number_format($request->amount, 2) . ")"
+                    );
+                }
+            }
+
             // Crear el pago principal
             $payment = Payment::create([
                 'enrollment_id' => $enrollment->id,
@@ -122,13 +143,26 @@ class PaymentController extends Controller
                 'payment_schedule_id' => null, // Múltiples cuotas
                 'payment_date' => now(),
                 'amount' => $request->amount,
-                'payment_method' => $request->payment_method,
-                'reference_number' => $request->reference_number,
+                'payment_method' => $useMultipleMethods ? 'multiple' : $request->payment_method,
+                'reference_number' => $useMultipleMethods ? null : $request->reference_number,
                 'received_by' => auth()->id(),
                 'cash_register_id' => $activeCashRegister->id,
                 'status' => 'completado',
                 'notes' => $request->notes,
             ]);
+
+            // Crear registros individuales de métodos de pago si se usan múltiples métodos
+            if ($useMultipleMethods) {
+                foreach ($request->payment_methods as $methodData) {
+                    \App\Models\PaymentMethod::create([
+                        'payment_id' => $payment->id,
+                        'method' => $methodData['method'],
+                        'amount' => $methodData['amount'],
+                        'reference_number' => $methodData['reference_number'] ?? null,
+                        'notes' => $methodData['notes'] ?? null,
+                    ]);
+                }
+            }
 
             // Aplicar el pago a las cuotas seleccionadas
             $remainingAmount = $request->amount;

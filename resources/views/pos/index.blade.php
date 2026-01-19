@@ -249,10 +249,20 @@
                             </div>
                         </div>
 
-                        <!-- Payment Method -->
-                        <div>
-                            <label class="label-elegant">Método de Pago</label>
-                            <div class="grid grid-cols-2 gap-2">
+                        <!-- Payment Method Toggle -->
+                        <div class="flex items-center justify-between mb-4">
+                            <label class="label-elegant mb-0">Método de Pago</label>
+                            <button type="button"
+                                    id="toggle-multiple-methods"
+                                    onclick="toggleMultiplePaymentMethods()"
+                                    class="text-sm px-3 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg font-medium transition-all">
+                                + Pagar con múltiples métodos
+                            </button>
+                        </div>
+
+                        <!-- Single Payment Method (Default) -->
+                        <div id="single-payment-method">
+                            <div class="grid grid-cols-2 gap-2 mb-4">
                                 <label class="flex items-center justify-center p-3 border-2 rounded-lg cursor-pointer transition-all hover:border-accent-red">
                                     <input type="radio" name="payment_method" value="efectivo" class="sr-only" checked onchange="toggleReference()">
                                     <span class="font-medium">💵 Efectivo</span>
@@ -270,16 +280,51 @@
                                     <span class="font-medium">📱 Yappy</span>
                                 </label>
                             </div>
+
+                            <!-- Reference Number -->
+                            <div id="reference-container" class="hidden">
+                                <label for="reference_number" class="label-elegant">Número de Referencia</label>
+                                <input type="text"
+                                       name="reference_number"
+                                       id="reference_number"
+                                       class="input-elegant"
+                                       placeholder="Ej: TRX123456">
+                            </div>
                         </div>
 
-                        <!-- Reference Number -->
-                        <div id="reference-container" class="hidden">
-                            <label for="reference_number" class="label-elegant">Número de Referencia</label>
-                            <input type="text" 
-                                   name="reference_number" 
-                                   id="reference_number"
-                                   class="input-elegant"
-                                   placeholder="Ej: TRX123456">
+                        <!-- Multiple Payment Methods -->
+                        <div id="multiple-payment-methods" class="hidden">
+                            <div class="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-3">
+                                <div class="flex items-start space-x-2 mb-3">
+                                    <svg class="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    <div>
+                                        <p class="text-sm font-semibold text-blue-800">Pago Dividido</p>
+                                        <p class="text-xs text-blue-700">La suma de todos los métodos debe ser igual al total</p>
+                                    </div>
+                                </div>
+
+                                <div id="payment-methods-list" class="space-y-3">
+                                    <!-- Payment methods will be added here dynamically -->
+                                </div>
+
+                                <button type="button"
+                                        onclick="addPaymentMethod()"
+                                        class="w-full mt-3 py-2 border-2 border-dashed border-blue-400 text-blue-700 rounded-lg hover:bg-blue-100 transition-all font-medium">
+                                    + Agregar Método
+                                </button>
+
+                                <div class="mt-4 pt-3 border-t-2 border-blue-300">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-700">Total Métodos:</span>
+                                        <span class="text-xl font-bold" id="methods-sum">$0.00</span>
+                                    </div>
+                                    <div id="methods-validation" class="mt-2 text-xs hidden">
+                                        <!-- Validation message -->
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Change Calculator (Only for cash) -->
@@ -342,6 +387,9 @@
 let searchTimeout = null;
 let selectedSchedules = [];
 let currentEnrollmentId = null;
+let paymentMethods = [];
+let paymentMethodCounter = 0;
+let useMultipleMethods = false;
 
 // Search students
 function searchStudents(query) {
@@ -603,6 +651,201 @@ document.addEventListener('DOMContentLoaded', function() {
     const checkedMethod = document.querySelector('input[name="payment_method"]:checked');
     if (checkedMethod) {
         checkedMethod.dispatchEvent(new Event('change'));
+    }
+});
+
+// Toggle between single and multiple payment methods
+window.toggleMultiplePaymentMethods = function() {
+    useMultipleMethods = !useMultipleMethods;
+    const singleMethodDiv = document.getElementById('single-payment-method');
+    const multipleMethodsDiv = document.getElementById('multiple-payment-methods');
+    const toggleBtn = document.getElementById('toggle-multiple-methods');
+
+    if (useMultipleMethods) {
+        singleMethodDiv.classList.add('hidden');
+        multipleMethodsDiv.classList.remove('hidden');
+        toggleBtn.textContent = '← Un solo método';
+        toggleBtn.classList.remove('bg-blue-100', 'text-blue-700', 'hover:bg-blue-200');
+        toggleBtn.classList.add('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+
+        // Clear payment methods and add first one
+        paymentMethods = [];
+        document.getElementById('payment-methods-list').innerHTML = '';
+        addPaymentMethod();
+    } else {
+        singleMethodDiv.classList.remove('hidden');
+        multipleMethodsDiv.classList.add('hidden');
+        toggleBtn.textContent = '+ Pagar con múltiples métodos';
+        toggleBtn.classList.remove('bg-gray-100', 'text-gray-700', 'hover:bg-gray-200');
+        toggleBtn.classList.add('bg-blue-100', 'text-blue-700', 'hover:bg-blue-200');
+
+        // Clear payment methods
+        paymentMethods = [];
+    }
+};
+
+// Add a payment method
+window.addPaymentMethod = function() {
+    const id = ++paymentMethodCounter;
+    const methodHtml = `
+        <div class="payment-method-item bg-white border-2 border-gray-300 rounded-lg p-3" data-method-id="${id}">
+            <div class="flex items-start justify-between mb-2">
+                <span class="text-sm font-semibold text-gray-700">Método #${paymentMethods.length + 1}</span>
+                <button type="button"
+                        onclick="removePaymentMethod(${id})"
+                        class="text-red-600 hover:text-red-800 text-sm font-medium">
+                    ✕ Quitar
+                </button>
+            </div>
+
+            <div class="space-y-2">
+                <select class="input-elegant text-sm payment-method-select" data-method-id="${id}" onchange="updateMethodsSum()">
+                    <option value="">Seleccionar método...</option>
+                    <option value="efectivo">💵 Efectivo</option>
+                    <option value="transferencia">🏦 Transferencia</option>
+                    <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                    <option value="tarjeta_debito">💳 Tarjeta Débito</option>
+                    <option value="yappy">📱 Yappy</option>
+                    <option value="otro">📋 Otro</option>
+                </select>
+
+                <input type="number"
+                       class="input-elegant text-sm payment-method-amount"
+                       data-method-id="${id}"
+                       placeholder="Monto $"
+                       step="0.01"
+                       min="0.01"
+                       oninput="updateMethodsSum()">
+
+                <input type="text"
+                       class="input-elegant text-sm payment-method-reference"
+                       data-method-id="${id}"
+                       placeholder="Referencia (opcional)">
+            </div>
+        </div>
+    `;
+
+    document.getElementById('payment-methods-list').insertAdjacentHTML('beforeend', methodHtml);
+    paymentMethods.push({ id, method: '', amount: 0, reference: '' });
+};
+
+// Remove a payment method
+window.removePaymentMethod = function(id) {
+    const element = document.querySelector(`.payment-method-item[data-method-id="${id}"]`);
+    if (element) {
+        element.remove();
+        paymentMethods = paymentMethods.filter(m => m.id !== id);
+
+        // Renumber remaining methods
+        document.querySelectorAll('.payment-method-item').forEach((item, index) => {
+            item.querySelector('span').textContent = `Método #${index + 1}`;
+        });
+
+        updateMethodsSum();
+    }
+};
+
+// Update the sum of all payment methods
+window.updateMethodsSum = function() {
+    let sum = 0;
+
+    document.querySelectorAll('.payment-method-amount').forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        sum += amount;
+    });
+
+    document.getElementById('methods-sum').textContent = '$' + sum.toFixed(2);
+
+    // Validate against total
+    const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+    const validationDiv = document.getElementById('methods-validation');
+
+    if (sum > 0 && totalAmount > 0) {
+        const diff = Math.abs(sum - totalAmount);
+
+        if (diff < 0.01) {
+            // Valid
+            validationDiv.innerHTML = '<span class="text-green-700 font-semibold">✓ Los métodos suman correctamente</span>';
+            validationDiv.classList.remove('hidden', 'text-red-700');
+            validationDiv.classList.add('text-green-700');
+        } else if (sum < totalAmount) {
+            // Insufficient
+            validationDiv.innerHTML = '<span class="text-yellow-700 font-semibold">⚠ Falta $' + (totalAmount - sum).toFixed(2) + '</span>';
+            validationDiv.classList.remove('hidden', 'text-green-700');
+            validationDiv.classList.add('text-yellow-700');
+        } else {
+            // Exceeds
+            validationDiv.innerHTML = '<span class="text-red-700 font-semibold">✕ Excede por $' + (sum - totalAmount).toFixed(2) + '</span>';
+            validationDiv.classList.remove('hidden', 'text-green-700');
+            validationDiv.classList.add('text-red-700');
+        }
+    } else {
+        validationDiv.classList.add('hidden');
+    }
+};
+
+// Override form submission to handle multiple payment methods
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('payment-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (useMultipleMethods) {
+                e.preventDefault();
+
+                // Collect payment methods data
+                const methodsData = [];
+                document.querySelectorAll('.payment-method-item').forEach(item => {
+                    const id = item.dataset.methodId;
+                    const method = item.querySelector('.payment-method-select').value;
+                    const amount = parseFloat(item.querySelector('.payment-method-amount').value) || 0;
+                    const reference = item.querySelector('.payment-method-reference').value;
+
+                    if (method && amount > 0) {
+                        methodsData.push({ method, amount, reference_number: reference });
+                    }
+                });
+
+                if (methodsData.length === 0) {
+                    alert('Debes agregar al menos un método de pago');
+                    return;
+                }
+
+                // Validate sum
+                const totalAmount = parseFloat(document.getElementById('amount').value) || 0;
+                const sum = methodsData.reduce((acc, m) => acc + m.amount, 0);
+
+                if (Math.abs(sum - totalAmount) > 0.01) {
+                    alert('La suma de los métodos de pago debe ser igual al total');
+                    return;
+                }
+
+                // Add payment methods as hidden inputs
+                methodsData.forEach((method, index) => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = `payment_methods[${index}][method]`;
+                    input.value = method.method;
+                    form.appendChild(input);
+
+                    const amountInput = document.createElement('input');
+                    amountInput.type = 'hidden';
+                    amountInput.name = `payment_methods[${index}][amount]`;
+                    amountInput.value = method.amount;
+                    form.appendChild(amountInput);
+
+                    if (method.reference_number) {
+                        const refInput = document.createElement('input');
+                        refInput.type = 'hidden';
+                        refInput.name = `payment_methods[${index}][reference_number]`;
+                        refInput.value = method.reference_number;
+                        form.appendChild(refInput);
+                    }
+                });
+
+                // Submit form
+                form.submit();
+            }
+        });
     }
 });
 </script>
