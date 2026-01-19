@@ -27,14 +27,16 @@ class StorePublicLeadRequest extends FormRequest
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:leads,email'],
             'phone' => ['required', 'string', 'max:20'],
-            
+
             // Datos del CSV y lógica de edad
+            'who_fills_form' => ['nullable', 'in:Alumna,Madre/Padre,Tutor'],
+            'age' => ['required', 'numeric'],
             'birth_date_text' => ['required', 'date', 'before:today'],
             'address_full' => ['required', 'string', 'max:500'],
             'occupation' => ['required', 'string', 'max:255'],
             'social_media_handle' => ['nullable', 'string', 'max:255'],
             'medical_notes_lead' => ['nullable', 'string', 'max:1000'],
-            
+
             // Validación condicional para Menores de Edad (Tutor)
             'parent_name' => [$this->isMinor() ? 'required' : 'nullable', 'string', 'max:255'],
             'parent_phone' => [$this->isMinor() ? 'required' : 'nullable', 'string', 'max:20'],

@@ -25,7 +25,9 @@ class PublicLeadController extends Controller
         $courses = Course::where('is_active', true)
             ->whereHas('offerings', function($q) {
                 $q->where('is_active', true)
-                  ->whereIn('status', ['programado', 'en_curso']);
+                  ->whereIn('status', ['programado', 'en_curso'])
+                  ->where('start_date', '>', now()->toDateString())
+                  ->whereRaw('max_students > (SELECT COUNT(*) FROM enrollments WHERE course_offering_id = course_offerings.id AND status IN ("inscrito", "en_curso"))');
             })->get();
 
         return view('public.leads.register', compact('courses'));
@@ -42,7 +44,12 @@ class PublicLeadController extends Controller
                 ->with(['dates'])
                 ->where('is_active', true)
                 ->whereIn('status', ['programado', 'en_curso'])
+                ->where('start_date', '>', now()->toDateString())
+                ->whereRaw('max_students > (SELECT COUNT(*) FROM enrollments WHERE course_offering_id = course_offerings.id AND status IN ("inscrito", "en_curso"))')
                 ->get()
+                ->filter(function ($offering) {
+                    return $offering->available_spots > 0;
+                })
                 ->map(function ($offering) {
                     return [
                         'id' => $offering->id,
@@ -65,11 +72,11 @@ class PublicLeadController extends Controller
         $validated = $request->validate([
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'email' => 'required|email', 
+            'email' => 'required|email',
             'phone' => 'required|string|max:20',
             'course_offering_id' => 'required|exists:course_offerings,id',
             'student_photo' => 'nullable|image|max:2048',
-            'who_fills_form' => 'required|in:Alumna,Madre/Padre,Tutor',
+            'who_fills_form' => 'nullable|in:Alumna,Madre/Padre,Tutor',
             'age' => 'required|numeric',
             'birth_date_text' => 'required|date',
             'address_full' => 'required|string',
@@ -82,6 +89,11 @@ class PublicLeadController extends Controller
             'medical_notes_lead' => 'nullable|string',
             'payment_receipt' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
+
+        // Si no se proporciona who_fills_form (persona mayor de edad), establecer valor por defecto
+        if (empty($validated['who_fills_form'])) {
+            $validated['who_fills_form'] = 'Alumna';
+        }
 
         DB::beginTransaction();
 

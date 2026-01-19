@@ -34,15 +34,6 @@
         <div class="card-premium mb-8">
             <h2 class="text-xl font-display font-semibold text-primary-dark mb-6">2. Información Personal</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="md:col-span-2">
-                    <label class="label-elegant">¿Quién completa este formulario? *</label>
-                    <select name="who_fills_form" class="input-elegant" required>
-                        <option value="">Selecciona una opción</option>
-                        <option value="Alumna">La propia alumna</option>
-                        <option value="Madre/Padre">Madre o Padre</option>
-                        <option value="Tutor">Tutor Legal</option>
-                    </select>
-                </div>
                 <div>
                     <label class="label-elegant">Nombre completo de la alumna *</label>
                     <input type="text" name="first_name" class="input-elegant" required placeholder="Nombres" value="{{ old('first_name') }}">
@@ -66,6 +57,16 @@
                 <div>
                     <label class="label-elegant">Fotografía de la alumna (Opcional)</label>
                     <input type="file" name="student_photo" class="input-elegant" accept="image/*">
+                </div>
+
+                <div id="who_fills_form_container" class="md:col-span-2 hidden">
+                    <label class="label-elegant">¿Quién completa este formulario? *</label>
+                    <select name="who_fills_form" id="who_fills_form" class="input-elegant">
+                        <option value="">Selecciona una opción</option>
+                        <option value="Alumna" selected>La propia alumna</option>
+                        <option value="Madre/Padre">Madre o Padre</option>
+                        <option value="Tutor">Tutor Legal</option>
+                    </select>
                 </div>
 
                 <input type="hidden" name="age" id="age_hidden" value="{{ old('age') }}">
@@ -177,12 +178,14 @@
         }
     }
 
-    // 2. Cálculo de edad y gestión de tutor
+    // 2. Cálculo de edad y gestión de campos condicionales
     function checkAge() {
         const birthDateValue = document.getElementById('birth_date').value;
         const tutorSection = document.getElementById('tutor_section');
         const tutorFields = document.querySelectorAll('.tutor-field');
         const ageHidden = document.getElementById('age_hidden');
+        const whoFillsContainer = document.getElementById('who_fills_form_container');
+        const whoFillsField = document.getElementById('who_fills_form');
 
         if (!birthDateValue) return;
 
@@ -199,9 +202,19 @@
         ageHidden.value = age;
 
         if (age < 18) {
+            // Menor de edad: mostrar ambos campos (quien completa y datos de tutor)
+            whoFillsContainer.classList.remove('hidden');
+            whoFillsField.required = true;
+            whoFillsField.value = ''; // Limpiar para que el usuario elija
+
             tutorSection.classList.remove('hidden');
             tutorFields.forEach(field => field.required = true);
         } else {
+            // Mayor de edad: ocultar campos y establecer valor por defecto
+            whoFillsContainer.classList.add('hidden');
+            whoFillsField.required = false;
+            whoFillsField.value = 'Alumna'; // Por defecto "La propia alumna"
+
             tutorSection.classList.add('hidden');
             tutorFields.forEach(field => field.required = false);
         }
