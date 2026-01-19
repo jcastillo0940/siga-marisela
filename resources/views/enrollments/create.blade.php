@@ -202,14 +202,30 @@
                         <!-- Notes -->
                         <div>
                             <label for="notes" class="label-elegant">Notas</label>
-                            <textarea id="notes" 
-                                      name="notes" 
+                            <textarea id="notes"
+                                      name="notes"
                                       rows="3"
                                       class="input-elegant @error('notes') border-red-500 @enderror"
                                       placeholder="Notas adicionales sobre la inscripción...">{{ old('notes') }}</textarea>
                             @error('notes')
                                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                             @enderror
+                        </div>
+
+                        <!-- Requires Approval -->
+                        <div class="flex items-center space-x-3 p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                            <input type="checkbox"
+                                   id="requires_approval"
+                                   name="requires_approval"
+                                   value="1"
+                                   {{ old('requires_approval') ? 'checked' : '' }}
+                                   class="w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500">
+                            <label for="requires_approval" class="flex-1">
+                                <span class="font-semibold text-gray-900">Requiere aprobación de dirección</span>
+                                <p class="text-sm text-gray-600 mt-1">
+                                    Marca esta casilla si la inscripción necesita ser aprobada por dirección antes de ser procesada completamente.
+                                </p>
+                            </label>
                         </div>
                     </div>
                 </div>

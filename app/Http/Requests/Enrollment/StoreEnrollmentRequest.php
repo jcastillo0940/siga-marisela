@@ -21,6 +21,7 @@ class StoreEnrollmentRequest extends FormRequest
             'discount' => ['nullable', 'numeric', 'min:0'],
             'status' => ['nullable', 'in:inscrito,en_curso,completado,retirado,suspendido'],
             'notes' => ['nullable', 'string'],
+            'requires_approval' => ['nullable', 'boolean'],
             
             // Payment plan fields
             'payment_type' => ['required', 'in:contado,cuotas'],

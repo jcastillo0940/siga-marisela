@@ -158,11 +158,11 @@ class EnrollmentController extends Controller
     public function searchStudents(Request $request)
     {
         $query = $request->get('q', '');
-        
+
         if (strlen($query) < 2) {
             return response()->json([]);
         }
-        
+
         $students = Student::where('is_active', true)
             ->where(function($q) use ($query) {
                 $q->where('first_name', 'like', "%{$query}%")
@@ -172,7 +172,102 @@ class EnrollmentController extends Controller
             })
             ->limit(10)
             ->get(['id', 'first_name', 'last_name', 'identification', 'email', 'phone']);
-        
+
         return response()->json($students);
+    }
+
+    /**
+     * Muestra inscripciones pendientes de aprobación
+     */
+    public function pendingApprovals()
+    {
+        $enrollments = \App\Models\Enrollment::with([
+            'student',
+            'courseOffering.course',
+            'courseOffering.dates'
+        ])
+        ->where('requires_approval', true)
+        ->whereNull('management_approved')
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+        return view('enrollments.pending-approvals', compact('enrollments'));
+    }
+
+    /**
+     * Aprueba una inscripción
+     */
+    public function approve(Request $request, int $id)
+    {
+        $request->validate([
+            'approval_notes' => 'nullable|string|max:1000'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $enrollment = \App\Models\Enrollment::findOrFail($id);
+
+            if (!$enrollment->requires_approval) {
+                throw new \Exception('Esta inscripción no requiere aprobación');
+            }
+
+            if ($enrollment->management_approved !== null) {
+                throw new \Exception('Esta inscripción ya fue procesada');
+            }
+
+            $enrollment->management_approved = true;
+            $enrollment->approved_by = auth()->id();
+            $enrollment->approved_at = now();
+            $enrollment->approval_notes = $request->approval_notes;
+            $enrollment->save();
+
+            DB::commit();
+
+            return back()->with('success', 'Inscripción aprobada exitosamente');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error al aprobar inscripción: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Rechaza una inscripción
+     */
+    public function reject(Request $request, int $id)
+    {
+        $request->validate([
+            'approval_notes' => 'required|string|max:1000'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $enrollment = \App\Models\Enrollment::findOrFail($id);
+
+            if (!$enrollment->requires_approval) {
+                throw new \Exception('Esta inscripción no requiere aprobación');
+            }
+
+            if ($enrollment->management_approved !== null) {
+                throw new \Exception('Esta inscripción ya fue procesada');
+            }
+
+            $enrollment->management_approved = false;
+            $enrollment->approved_by = auth()->id();
+            $enrollment->approved_at = now();
+            $enrollment->approval_notes = $request->approval_notes;
+            $enrollment->status = 'retirado'; // Cambiar estado a retirado
+            $enrollment->save();
+
+            DB::commit();
+
+            return back()->with('success', 'Inscripción rechazada');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Error al rechazar inscripción: ' . $e->getMessage());
+        }
     }
 }

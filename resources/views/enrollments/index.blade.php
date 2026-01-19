@@ -13,7 +13,20 @@
             </p>
         </div>
         
-        <div class="flex space-x-4 w-full sm:w-auto">
+        <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            @php
+                $pendingCount = $enrollments->where('requires_approval', true)->where('management_approved', null)->count();
+            @endphp
+            @if($pendingCount > 0)
+            <a href="{{ route('enrollments.pending-approvals') }}" class="btn-secondary text-center relative">
+                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                Pendientes de Aprobación
+                <span class="inline-flex items-center justify-center px-2 py-1 ml-2 text-xs font-bold leading-none text-white bg-red-600 rounded-full">{{ $pendingCount }}</span>
+            </a>
+            @endif
+
             @if(auth()->user()->hasPermission('enrollments.create'))
             <a href="{{ route('enrollments.create') }}" class="btn-primary text-center flex-1 sm:flex-none">
                 <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -157,6 +170,11 @@
                                     </span>
                                     @if($enrollment->certificate_issued)
                                         <span class="badge badge-success block">Certificado</span>
+                                    @endif
+                                    @if($enrollment->requires_approval)
+                                        <span class="badge block {{ $enrollment->approval_status_label }}">
+                                            {{ $enrollment->approval_status }}
+                                        </span>
                                     @endif
                                 </div>
                             </td>

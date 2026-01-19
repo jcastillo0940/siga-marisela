@@ -72,6 +72,9 @@ Route::middleware('auth')->group(function () {
     Route::resource('course-offerings', CourseOfferingController::class);
     
     // Enrollments
+    Route::get('enrollments/pending-approvals', [EnrollmentController::class, 'pendingApprovals'])->name('enrollments.pending-approvals');
+    Route::post('enrollments/{enrollment}/approve', [EnrollmentController::class, 'approve'])->name('enrollments.approve');
+    Route::post('enrollments/{enrollment}/reject', [EnrollmentController::class, 'reject'])->name('enrollments.reject');
     Route::post('enrollments/{enrollment}/issue-certificate', [EnrollmentController::class, 'issueCertificate'])->name('enrollments.issue-certificate');
     Route::resource('enrollments', EnrollmentController::class);
     Route::get('api/students/search', [EnrollmentController::class, 'searchStudents'])->name('api.students.search');

@@ -11,7 +11,8 @@ class CreateEnrollmentDTO
         public readonly float $price_paid,
         public readonly string $status = 'inscrito',
         public readonly float $discount = 0,
-        public readonly ?string $notes = null
+        public readonly ?string $notes = null,
+        public readonly bool $requires_approval = false
     ) {}
 
     public static function fromRequest(array $data): self
@@ -23,7 +24,8 @@ class CreateEnrollmentDTO
             price_paid: $data['price_paid'],
             status: $data['status'] ?? 'inscrito',
             discount: $data['discount'] ?? 0,
-            notes: $data['notes'] ?? null
+            notes: $data['notes'] ?? null,
+            requires_approval: $data['requires_approval'] ?? false
         );
     }
 
@@ -37,6 +39,7 @@ class CreateEnrollmentDTO
             'status' => $this->status,
             'discount' => $this->discount,
             'notes' => $this->notes,
+            'requires_approval' => $this->requires_approval,
         ];
     }
 }

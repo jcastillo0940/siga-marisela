@@ -23,6 +23,11 @@ class Enrollment extends Model
         'notes',
         'certificate_issued',
         'certificate_issued_at',
+        'requires_approval',
+        'management_approved',
+        'approved_by',
+        'approved_at',
+        'approval_notes',
     ];
 
     protected $casts = [
@@ -31,6 +36,9 @@ class Enrollment extends Model
         'price_paid' => 'decimal:2',
         'discount' => 'decimal:2',
         'certificate_issued' => 'boolean',
+        'requires_approval' => 'boolean',
+        'management_approved' => 'boolean',
+        'approved_at' => 'datetime',
     ];
 
     // Relaciones
@@ -63,6 +71,11 @@ class Enrollment extends Model
     public function certificates(): HasMany
     {
         return $this->hasMany(Certificate::class);
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     // Accessor para saber si tiene plan de pagos
@@ -136,6 +149,37 @@ class Enrollment extends Model
     public function getBalanceAttribute(): float
     {
         return $this->payment_balance;
+    }
+
+    // ACCESSORS PARA APROBACIÓN
+    public function getApprovalStatusAttribute(): string
+    {
+        if (!$this->requires_approval) {
+            return 'No requiere';
+        }
+
+        if ($this->management_approved === null) {
+            return 'Pendiente';
+        }
+
+        return $this->management_approved ? 'Aprobada' : 'Rechazada';
+    }
+
+    public function getApprovalStatusLabelAttribute(): string
+    {
+        $labels = [
+            'No requiere' => 'bg-gray-100 text-gray-800',
+            'Pendiente' => 'bg-yellow-100 text-yellow-800',
+            'Aprobada' => 'bg-green-100 text-green-800',
+            'Rechazada' => 'bg-red-100 text-red-800',
+        ];
+
+        return $labels[$this->approval_status] ?? 'bg-gray-100 text-gray-800';
+    }
+
+    public function getIsPendingApprovalAttribute(): bool
+    {
+        return $this->requires_approval && $this->management_approved === null;
     }
 
     // Boot method para generar código automático
