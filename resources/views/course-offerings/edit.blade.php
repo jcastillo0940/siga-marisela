@@ -135,13 +135,15 @@
 
                         <!-- Start Date -->
                         <div>
-                            <label for="start_date" class="label-elegant">Fecha de Inicio *</label>
-                            <input type="date" 
-                                   id="start_date" 
-                                   name="start_date" 
+                            <label for="start_date" class="label-elegant">Fecha de Inicio (Auto-calculada) *</label>
+                            <input type="date"
+                                   id="start_date"
+                                   name="start_date"
                                    value="{{ old('start_date', $offering->start_date->format('Y-m-d')) }}"
-                                   class="input-elegant @error('start_date') border-red-500 @enderror"
+                                   class="input-elegant bg-gray-100 cursor-not-allowed @error('start_date') border-red-500 @enderror"
+                                   readonly
                                    required>
+                            <p class="text-xs text-gray-500 mt-1">Se calcula desde la primera clase programada</p>
                             @error('start_date')
                                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -149,13 +151,15 @@
 
                         <!-- End Date -->
                         <div>
-                            <label for="end_date" class="label-elegant">Fecha de Fin *</label>
-                            <input type="date" 
-                                   id="end_date" 
-                                   name="end_date" 
+                            <label for="end_date" class="label-elegant">Fecha de Fin (Auto-calculada) *</label>
+                            <input type="date"
+                                   id="end_date"
+                                   name="end_date"
                                    value="{{ old('end_date', $offering->end_date->format('Y-m-d')) }}"
-                                   class="input-elegant @error('end_date') border-red-500 @enderror"
+                                   class="input-elegant bg-gray-100 cursor-not-allowed @error('end_date') border-red-500 @enderror"
+                                   readonly
                                    required>
+                            <p class="text-xs text-gray-500 mt-1">Se calcula desde la última clase programada</p>
                             @error('end_date')
                                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -440,7 +444,7 @@ function toggleGenerationName() {
 function loadCourseDefaults() {
     const select = document.getElementById('course_id');
     const option = select.options[select.selectedIndex];
-    
+
     if (option.value) {
         document.getElementById('price').value = option.dataset.price || '';
         document.getElementById('duration_hours').value = option.dataset.duration || '';
@@ -450,58 +454,80 @@ function loadCourseDefaults() {
     }
 }
 
+// Update start_date and end_date based on class dates
+function updateOfferingDates() {
+    const dateInputs = document.querySelectorAll('input[name^="class_dates"][name$="[date]"]');
+    const dates = Array.from(dateInputs)
+        .map(input => input.value)
+        .filter(date => date !== '')
+        .sort();
+
+    const startDateField = document.getElementById('start_date');
+    const endDateField = document.getElementById('end_date');
+
+    if (dates.length > 0) {
+        startDateField.value = dates[0]; // Primera fecha
+        endDateField.value = dates[dates.length - 1]; // Última fecha
+    } else {
+        startDateField.value = '';
+        endDateField.value = '';
+    }
+}
+
 // Add class date
 function addClassDate() {
     const container = document.getElementById('class-dates-container');
     const dateDiv = document.createElement('div');
     dateDiv.className = 'border border-gray-200 rounded p-4 bg-neutral-bg';
     dateDiv.id = `class-date-${classDateIndex}`;
-    
+
     dateDiv.innerHTML = `
         <div class="flex items-center justify-between mb-3">
             <h4 class="font-medium text-primary-dark">Clase #${classDateIndex + 1}</h4>
-            <button type="button" 
-                    onclick="removeClassDate(${classDateIndex})" 
+            <button type="button"
+                    onclick="removeClassDate(${classDateIndex})"
                     class="text-red-600 hover:text-red-800">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             </button>
         </div>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
                 <label class="label-elegant">Fecha *</label>
-                <input type="date" 
-                       name="class_dates[${classDateIndex}][date]" 
-                       class="input-elegant" 
+                <input type="date"
+                       name="class_dates[${classDateIndex}][date]"
+                       class="input-elegant"
+                       onchange="updateOfferingDates()"
                        required>
             </div>
             <div>
                 <label class="label-elegant">Hora Inicio</label>
-                <input type="time" 
-                       name="class_dates[${classDateIndex}][start_time]" 
+                <input type="time"
+                       name="class_dates[${classDateIndex}][start_time]"
                        class="input-elegant">
             </div>
             <div>
                 <label class="label-elegant">Hora Fin</label>
-                <input type="time" 
-                       name="class_dates[${classDateIndex}][end_time]" 
+                <input type="time"
+                       name="class_dates[${classDateIndex}][end_time]"
                        class="input-elegant">
             </div>
         </div>
-        
+
         <div class="mt-3">
             <label class="label-elegant">Notas</label>
-            <input type="text" 
-                   name="class_dates[${classDateIndex}][notes]" 
-                   class="input-elegant" 
+            <input type="text"
+                   name="class_dates[${classDateIndex}][notes]"
+                   class="input-elegant"
                    placeholder="Ej: Salta por Carnaval">
         </div>
     `;
-    
+
     container.appendChild(dateDiv);
     classDateIndex++;
+    updateOfferingDates();
 }
 
 // Remove class date
@@ -509,8 +535,21 @@ function removeClassDate(index) {
     const element = document.getElementById(`class-date-${index}`);
     if (element) {
         element.remove();
+        updateOfferingDates();
     }
 }
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Add onchange event to existing date inputs
+    const existingDateInputs = document.querySelectorAll('input[name^="class_dates"][name$="[date]"]');
+    existingDateInputs.forEach(input => {
+        input.addEventListener('change', updateOfferingDates);
+    });
+
+    // Calculate initial dates
+    updateOfferingDates();
+});
 </script>
 @endpush
 @endsection

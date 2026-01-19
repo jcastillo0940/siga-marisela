@@ -43,6 +43,9 @@ class CourseOfferingService
                         'notes' => $dateData['notes'] ?? null,
                     ]);
                 }
+
+                // Auto-calcular start_date y end_date desde las fechas de clases
+                $this->updateOfferingDatesFromClasses($offering);
             }
 
             return $offering->fresh(['dates']);
@@ -70,6 +73,9 @@ class CourseOfferingService
                         'notes' => $dateData['notes'] ?? null,
                     ]);
                 }
+
+                // Auto-calcular start_date y end_date desde las fechas de clases
+                $this->updateOfferingDatesFromClasses($offering);
             }
 
             return $offering->fresh(['dates']);
@@ -92,5 +98,22 @@ class CourseOfferingService
             $offering->save();
             return $offering;
         });
+    }
+
+    /**
+     * Actualiza start_date y end_date del offering basándose en las fechas de clases
+     */
+    private function updateOfferingDatesFromClasses(CourseOffering $offering): void
+    {
+        $dates = $offering->dates()
+            ->orderBy('class_date')
+            ->pluck('class_date')
+            ->toArray();
+
+        if (!empty($dates)) {
+            $offering->start_date = reset($dates); // Primera fecha
+            $offering->end_date = end($dates);     // Última fecha
+            $offering->save();
+        }
     }
 }
