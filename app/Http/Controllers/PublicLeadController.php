@@ -96,6 +96,28 @@ class PublicLeadController extends Controller
             'payment_receipt' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ]);
 
+        // 2. Validar que el curso tenga fechas futuras y cupos disponibles
+        $offering = CourseOffering::with('dates')->find($validated['course_offering_id']);
+
+        if (!$offering) {
+            return back()->withInput()->with('error', 'La programación seleccionada no existe.');
+        }
+
+        // Verificar que tenga clases futuras
+        $hasFutureDates = $offering->dates()
+            ->where('class_date', '>', now()->toDateString())
+            ->where('is_cancelled', false)
+            ->exists();
+
+        if (!$hasFutureDates) {
+            return back()->withInput()->with('error', 'Este curso ya no tiene clases programadas. Por favor selecciona otro curso.');
+        }
+
+        // Verificar que tenga cupos disponibles
+        if ($offering->available_spots <= 0) {
+            return back()->withInput()->with('error', 'Este curso ya alcanzó su capacidad máxima. Por favor selecciona otro curso.');
+        }
+
         // Si no se proporciona who_fills_form (persona mayor de edad), establecer valor por defecto
         if (empty($validated['who_fills_form'])) {
             $validated['who_fills_form'] = 'Alumna';
