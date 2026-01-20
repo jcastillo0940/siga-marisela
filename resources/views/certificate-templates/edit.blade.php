@@ -164,11 +164,11 @@
                 <!-- Variables Reference -->
                 <div class="card-premium bg-blue-50 border-2 border-blue-200">
                     <h3 class="text-lg font-semibold text-primary-dark mb-3">Variables Disponibles</h3>
-                    <p class="text-sm text-gray-600 mb-3">Usa estas variables en tu HTML (ejemplo: <code class="bg-white px-2 py-1 rounded">{{'{{'}}student_name{{'}}'}}</code>)</p>
+                    <p class="text-sm text-gray-600 mb-3">Usa estas variables en tu HTML (ejemplo: <code class="bg-white px-2 py-1 rounded">@{{student_name}}</code>)</p>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
                         @foreach($availableVariables as $key => $description)
                         <div class="bg-white p-2 rounded border border-blue-200">
-                            <code class="text-blue-600 font-semibold">{{'{{'}}{{ $key }}{{'}}'}}</code>
+                            <code class="text-blue-600 font-semibold">{{ '{{ ' . $key . ' }}' }}</code>
                             <p class="text-gray-600 text-xs mt-1">{{ $description }}</p>
                         </div>
                         @endforeach
