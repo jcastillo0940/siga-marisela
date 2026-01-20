@@ -11,6 +11,7 @@ use App\Http\Controllers\CourseOfferingController;
 use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\CashRegisterController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\PublicLeadController; // Movido arriba
 use App\Http\Controllers\Web\AttendanceWebController;
 use App\Http\Controllers\Web\CertificateWebController;
@@ -96,7 +97,16 @@ Route::middleware('auth')->group(function () {
     
     // POS
     Route::get('pos', [PaymentController::class, 'pos'])->name('pos.index');
-    
+
+    // Ventas genéricas (productos/servicios)
+    Route::prefix('sales')->name('sales.')->group(function () {
+        Route::get('/', [SaleController::class, 'index'])->name('index');
+        Route::get('/pos', [SaleController::class, 'pos'])->name('pos');
+        Route::post('/', [SaleController::class, 'store'])->name('store');
+        Route::get('/{id}', [SaleController::class, 'show'])->name('show');
+        Route::post('/{id}/cancel', [SaleController::class, 'cancel'])->name('cancel');
+    });
+
     // Asistencia
     Route::prefix('attendance')->name('attendance.')->group(function () {
         Route::get('/', [AttendanceWebController::class, 'index'])->name('index');
