@@ -25,13 +25,11 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
-            'track_inventory' => 'boolean',
             'stock' => 'nullable|integer|min:0',
             'min_stock' => 'nullable|integer|min:0',
-            'active' => 'boolean',
         ]);
 
-        // Set defaults
+        // Set checkbox values
         $validated['track_inventory'] = $request->has('track_inventory');
         $validated['active'] = $request->has('active');
 
@@ -63,13 +61,11 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
-            'track_inventory' => 'boolean',
             'stock' => 'nullable|integer|min:0',
             'min_stock' => 'nullable|integer|min:0',
-            'active' => 'boolean',
         ]);
 
-        // Set defaults
+        // Set checkbox values
         $validated['track_inventory'] = $request->has('track_inventory');
         $validated['active'] = $request->has('active');
 
