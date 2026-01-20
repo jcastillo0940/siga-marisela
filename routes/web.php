@@ -115,4 +115,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/generate/{enrollment}', [CertificateWebController::class, 'generate'])->name('generate');
         Route::get('/{certificate}/download', [CertificateWebController::class, 'download'])->name('download');
     });
+
+    // Reportes
+    Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/accounts-receivable', [App\Http\Controllers\AccountsReceivableController::class, 'index'])->name('accounts-receivable');
+        Route::get('/accounts-receivable/pdf', [App\Http\Controllers\AccountsReceivableController::class, 'exportPdf'])->name('accounts-receivable.pdf');
+        Route::get('/accounts-receivable/excel', [App\Http\Controllers\AccountsReceivableController::class, 'exportExcel'])->name('accounts-receivable.excel');
+    });
 });
