@@ -14,6 +14,7 @@ use App\Http\Controllers\CashRegisterController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\StudentDashboardController;
+use App\Http\Controllers\CertificateTemplateController;
 use App\Http\Controllers\PublicLeadController; // Movido arriba
 use App\Http\Controllers\Web\AttendanceWebController;
 use App\Http\Controllers\Web\CertificateWebController;
@@ -132,6 +133,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/student/{student}', [CertificateWebController::class, 'studentCertificates'])->name('student');
         Route::post('/generate/{enrollment}', [CertificateWebController::class, 'generate'])->name('generate');
         Route::get('/{certificate}/download', [CertificateWebController::class, 'download'])->name('download');
+    });
+
+    // Plantillas de Certificados (CRUD)
+    Route::prefix('certificate-templates')->name('certificate-templates.')->group(function () {
+        Route::get('/', [CertificateTemplateController::class, 'index'])->name('index');
+        Route::get('/create', [CertificateTemplateController::class, 'create'])->name('create');
+        Route::post('/', [CertificateTemplateController::class, 'store'])->name('store');
+        Route::get('/{certificateTemplate}', [CertificateTemplateController::class, 'show'])->name('show');
+        Route::get('/{certificateTemplate}/edit', [CertificateTemplateController::class, 'edit'])->name('edit');
+        Route::put('/{certificateTemplate}', [CertificateTemplateController::class, 'update'])->name('update');
+        Route::delete('/{certificateTemplate}', [CertificateTemplateController::class, 'destroy'])->name('destroy');
+        Route::get('/{certificateTemplate}/preview', [CertificateTemplateController::class, 'preview'])->name('preview');
+        Route::post('/{certificateTemplate}/duplicate', [CertificateTemplateController::class, 'duplicate'])->name('duplicate');
     });
 
     // Reportes
