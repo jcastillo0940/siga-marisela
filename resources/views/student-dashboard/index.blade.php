@@ -247,6 +247,140 @@
                 </div>
                 @endif
             </div>
+
+            <!-- Material Didáctico -->
+            <div class="card-premium">
+                <h3 class="text-xl font-display font-semibold text-primary-dark mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    Material Didáctico
+                </h3>
+
+                @if($materials->isEmpty())
+                <p class="text-gray-500 text-center py-8">No hay material disponible aún</p>
+                @else
+                <div class="space-y-3 max-h-96 overflow-y-auto">
+                    @foreach($materials as $item)
+                    <div class="p-4 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg border border-orange-200 hover:border-orange-400 transition-all">
+                        <div class="flex items-start space-x-3">
+                            <span class="text-3xl">{{ $item['material']->type_icon }}</span>
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-primary-dark">{{ $item['material']->title }}</h4>
+                                <p class="text-xs text-gray-500 mt-1">{{ $item['course']->name }}</p>
+                                @if($item['material']->description)
+                                <p class="text-sm text-gray-600 mt-1">{{ Str::limit($item['material']->description, 80) }}</p>
+                                @endif
+                                <div class="flex items-center space-x-3 mt-2">
+                                    <span class="badge badge-warning">{{ $item['material']->type_label }}</span>
+                                    @if($item['material']->file_size)
+                                    <span class="text-xs text-gray-500">{{ $item['material']->formatted_file_size }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                            @if($item['material']->type === 'link' || $item['material']->external_url)
+                            <a href="{{ $item['material']->external_url }}" target="_blank" class="btn-primary text-xs">
+                                Abrir
+                            </a>
+                            @elseif($item['material']->file_path)
+                            <a href="{{ $item['material']->file_url }}" download class="btn-primary text-xs">
+                                Descargar
+                            </a>
+                            @endif
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+            </div>
+
+            <!-- Selección de Menú -->
+            @if(!$availableMenus->isEmpty())
+            <div class="card-premium">
+                <h3 class="text-xl font-display font-semibold text-primary-dark mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Selección de Menú
+                </h3>
+
+                <div class="space-y-4">
+                    @foreach($availableMenus as $item)
+                    @php
+                        $menu = $item['menu'];
+                        $enrollment = $item['enrollment'];
+                        $currentSelection = $menu->getStudentSelection($enrollment->id);
+                    @endphp
+                    <div class="p-4 border-2 border-gray-200 rounded-lg">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="font-semibold text-primary-dark flex items-center">
+                                    <span class="text-2xl mr-2">{{ $menu->meal_type_icon }}</span>
+                                    {{ $menu->meal_type_label }}
+                                </h4>
+                                <p class="text-sm text-gray-600">{{ $menu->meal_date->format('d/m/Y') }}</p>
+                                <p class="text-xs text-gray-500">{{ $item['course']->name }}</p>
+                            </div>
+                            @if($currentSelection)
+                            <span class="status-badge status-badge-success">Seleccionado</span>
+                            @endif
+                        </div>
+
+                        @if($menu->menu_description)
+                        <p class="text-sm text-gray-700 mb-3">{{ $menu->menu_description }}</p>
+                        @endif
+
+                        @if($currentSelection)
+                        <div class="p-3 bg-green-50 border border-green-200 rounded mb-3">
+                            <p class="text-sm font-semibold text-green-800">Tu selección: {{ $currentSelection->mealOption->name }}</p>
+                            @if($currentSelection->notes)
+                            <p class="text-xs text-green-600 mt-1">Nota: {{ $currentSelection->notes }}</p>
+                            @endif
+                        </div>
+                        @endif
+
+                        <form action="{{ route('student-dashboard.select-meal', $student->id) }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="meal_menu_id" value="{{ $menu->id }}">
+                            <input type="hidden" name="enrollment_id" value="{{ $enrollment->id }}">
+
+                            <div class="space-y-2 mb-3">
+                                @foreach($menu->options as $option)
+                                <label class="flex items-center p-3 border-2 rounded {{ $currentSelection && $currentSelection->meal_option_id == $option->id ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-blue-300' }} cursor-pointer transition-all">
+                                    <input type="radio" name="meal_option_id" value="{{ $option->id }}" class="w-4 h-4 text-accent-red" {{ $currentSelection && $currentSelection->meal_option_id == $option->id ? 'checked' : '' }} required>
+                                    <div class="ml-3 flex-1">
+                                        <p class="font-semibold text-sm">{{ $option->name }}</p>
+                                        @if($option->description)
+                                        <p class="text-xs text-gray-600">{{ $option->description }}</p>
+                                        @endif
+                                        <div class="flex items-center space-x-2 mt-1">
+                                            @foreach($option->dietary_labels as $label)
+                                            <span class="text-xs px-2 py-1 bg-{{ $label['color'] }}-100 text-{{ $label['color'] }}-700 rounded">
+                                                {{ $label['icon'] }} {{ $label['label'] }}
+                                            </span>
+                                            @endforeach
+                                            @if($option->available_quantity !== null)
+                                            <span class="text-xs text-gray-500">({{ $option->remaining_quantity }} disponibles)</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </label>
+                                @endforeach
+                            </div>
+
+                            <div class="mb-3">
+                                <input type="text" name="notes" placeholder="Notas especiales (opcional)" class="input-elegant text-sm" value="{{ $currentSelection->notes ?? '' }}">
+                            </div>
+
+                            <button type="submit" class="btn-primary w-full text-sm">
+                                {{ $currentSelection ? 'Actualizar Selección' : 'Guardar Selección' }}
+                            </button>
+                        </form>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
         </div>
 
         <!-- Right Column - 1/3 width -->
