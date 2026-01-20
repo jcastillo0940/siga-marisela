@@ -74,20 +74,21 @@
 <div class="accordion-menu">
     <button onclick="toggleAccordion('asistencia-menu')" type="button"
             class="w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-sm transition-all duration-300 hover:bg-white hover:bg-opacity-5
-                   {{ request()->routeIs('attendance.*') || request()->routeIs('certificates.*') ? 'bg-white bg-opacity-10' : '' }}">
+                   {{ request()->routeIs('attendance.*') || request()->routeIs('certificates.*') || request()->routeIs('certificate-templates.*') ? 'bg-white bg-opacity-10' : '' }}">
         <div class="flex items-center">
             <svg class="w-5 h-5 mr-3 sm:mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
             </svg>
             <span class="text-xs font-medium tracking-widest uppercase">Asistencia</span>
         </div>
-        <svg id="asistencia-menu-icon" class="w-4 h-4 transition-transform duration-200 {{ request()->routeIs('attendance.*') || request()->routeIs('certificates.*') ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg id="asistencia-menu-icon" class="w-4 h-4 transition-transform duration-200 {{ request()->routeIs('attendance.*') || request()->routeIs('certificates.*') || request()->routeIs('certificate-templates.*') ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
     </button>
-    <div id="asistencia-menu" class="accordion-content {{ request()->routeIs('attendance.*') || request()->routeIs('certificates.*') ? '' : 'hidden' }} ml-4 sm:ml-8 mt-1 space-y-1">
-        <a href="{{ route('attendance.index') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('attendance.*') ? 'text-white font-bold' : 'text-red-100' }}">Gestión de Asistencia</a>
-        <a href="{{ route('certificates.index') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('certificates.*') ? 'text-white font-bold' : 'text-red-100' }}">Certificados</a>
+    <div id="asistencia-menu" class="accordion-content {{ request()->routeIs('attendance.*') || request()->routeIs('certificates.*') || request()->routeIs('certificate-templates.*') ? '' : 'hidden' }} ml-4 sm:ml-8 mt-1 space-y-1">
+        <a href="{{ route('attendance.index') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('attendance.*') && !request()->routeIs('attendance.student-qr') && !request()->routeIs('attendance.scan-qr') ? 'text-white font-bold' : 'text-red-100' }}">Gestión de Asistencia</a>
+        <a href="{{ route('certificates.index') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('certificates.*') && !request()->routeIs('certificate-templates.*') ? 'text-white font-bold' : 'text-red-100' }}">Certificados</a>
+        <a href="{{ route('certificate-templates.index') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('certificate-templates.*') ? 'text-white font-bold' : 'text-red-100' }}">Plantillas de Certificados</a>
     </div>
 </div>
 
