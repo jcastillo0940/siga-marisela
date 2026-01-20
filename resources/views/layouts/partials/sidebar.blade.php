@@ -83,30 +83,53 @@
 
         @if(auth()->user()->hasPermission('payments.view'))
         <div class="accordion-menu">
-            <button onclick="toggleAccordion('pos-menu')" 
+            <button onclick="toggleAccordion('pos-menu')"
                     type="button"
                     class="w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-sm transition-all duration-300 hover:bg-white hover:bg-opacity-5
-                           {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') ? 'bg-white bg-opacity-10' : '' }}">
+                           {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') ? 'bg-white bg-opacity-10' : '' }}">
                 <div class="flex items-center">
                     <svg class="w-5 h-5 mr-3 sm:mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
                     </svg>
                     <span class="text-xs font-medium tracking-widest uppercase">POS / Caja</span>
                 </div>
-                <svg id="pos-menu-icon" class="w-4 h-4 transition-transform duration-200 {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg id="pos-menu-icon" class="w-4 h-4 transition-transform duration-200 {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </button>
-            <div id="pos-menu" class="accordion-content {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') ? '' : 'hidden' }} ml-4 sm:ml-8 mt-1 space-y-1">
-                <a href="{{ route('pos.index') }}" 
-                   class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('pos.*') ? 'text-white font-bold' : 'text-red-100' }}">Punto de Venta</a>
-                <a href="{{ route('cash-registers.index') }}" 
+            <div id="pos-menu" class="accordion-content {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') ? '' : 'hidden' }} ml-4 sm:ml-8 mt-1 space-y-1">
+                <a href="{{ route('pos.index') }}"
+                   class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('pos.index') ? 'text-white font-bold' : 'text-red-100' }}">POS - Pagos Estudiantes</a>
+                <a href="{{ route('sales.pos') }}"
+                   class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('sales.pos') ? 'text-white font-bold' : 'text-red-100' }}">POS - Productos/Servicios</a>
+                <a href="{{ route('cash-registers.index') }}"
                    class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('cash-registers.*') ? 'text-white font-bold' : 'text-red-100' }}">Gestión de Caja</a>
-                <a href="{{ route('payments.index') }}" 
-                   class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('payments.*') ? 'text-white font-bold' : 'text-red-100' }}">Historial de Pagos</a>
+                <a href="{{ route('payments.index') }}"
+                   class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('payments.index') || request()->routeIs('payments.show') || request()->routeIs('payments.create') ? 'text-white font-bold' : 'text-red-100' }}">Historial de Pagos</a>
+                <a href="{{ route('sales.index') }}"
+                   class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('sales.index') || request()->routeIs('sales.show') ? 'text-white font-bold' : 'text-red-100' }}">Historial de Ventas</a>
             </div>
         </div>
         @endif
+
+        <div class="accordion-menu">
+            <button onclick="toggleAccordion('reports-menu')" type="button"
+                    class="w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-sm transition-all duration-300 hover:bg-white hover:bg-opacity-5
+                           {{ request()->routeIs('reports.*') ? 'bg-white bg-opacity-10' : '' }}">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-3 sm:mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span class="text-xs font-medium tracking-widest uppercase">Reportes</span>
+                </div>
+                <svg id="reports-menu-icon" class="w-4 h-4 transition-transform duration-200 {{ request()->routeIs('reports.*') ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+            </button>
+            <div id="reports-menu" class="accordion-content {{ request()->routeIs('reports.*') ? '' : 'hidden' }} ml-4 sm:ml-8 mt-1 space-y-1">
+                <a href="{{ route('reports.accounts-receivable') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('reports.accounts-receivable*') ? 'text-white font-bold' : 'text-red-100' }}">Cuentas por Cobrar</a>
+            </div>
+        </div>
 
         <div class="accordion-menu">
             <button onclick="toggleAccordion('admin-menu')" type="button"
