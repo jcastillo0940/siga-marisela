@@ -12,6 +12,7 @@ use App\Http\Controllers\EnrollmentController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\CashRegisterController;
 use App\Http\Controllers\SaleController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\PublicLeadController; // Movido arriba
 use App\Http\Controllers\Web\AttendanceWebController;
 use App\Http\Controllers\Web\CertificateWebController;
@@ -106,6 +107,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/{id}', [SaleController::class, 'show'])->name('show');
         Route::post('/{id}/cancel', [SaleController::class, 'cancel'])->name('cancel');
     });
+
+    // Productos y Servicios
+    Route::patch('products/{product}/toggle-status', [ProductController::class, 'toggleStatus'])->name('products.toggle-status');
+    Route::resource('products', ProductController::class);
 
     // Asistencia
     Route::prefix('attendance')->name('attendance.')->group(function () {

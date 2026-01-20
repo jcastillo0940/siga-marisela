@@ -53,7 +53,8 @@
                     <a href="{{ route('course-offerings.index') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('course-offerings.*') ? 'text-white font-bold' : 'text-red-100' }}">Programación Clases</a>
                 @endif
                 @if(auth()->user()->hasPermission('enrollments.view'))
-                    <a href="{{ route('enrollments.index') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('enrollments.*') ? 'text-white font-bold' : 'text-red-100' }}">Inscripciones</a>
+                    <a href="{{ route('enrollments.index') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('enrollments.index') || request()->routeIs('enrollments.show') || request()->routeIs('enrollments.create') || request()->routeIs('enrollments.edit') ? 'text-white font-bold' : 'text-red-100' }}">Inscripciones</a>
+                    <a href="{{ route('enrollments.pending-approvals') }}" class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('enrollments.pending-approvals') ? 'text-white font-bold' : 'text-red-100' }}">Aprobaciones Pendientes</a>
                 @endif
             </div>
         </div>
@@ -86,22 +87,24 @@
             <button onclick="toggleAccordion('pos-menu')"
                     type="button"
                     class="w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 rounded-sm transition-all duration-300 hover:bg-white hover:bg-opacity-5
-                           {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') ? 'bg-white bg-opacity-10' : '' }}">
+                           {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') || request()->routeIs('products.*') ? 'bg-white bg-opacity-10' : '' }}">
                 <div class="flex items-center">
                     <svg class="w-5 h-5 mr-3 sm:mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
                     </svg>
                     <span class="text-xs font-medium tracking-widest uppercase">POS / Caja</span>
                 </div>
-                <svg id="pos-menu-icon" class="w-4 h-4 transition-transform duration-200 {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg id="pos-menu-icon" class="w-4 h-4 transition-transform duration-200 {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') || request()->routeIs('products.*') ? 'rotate-180' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                 </svg>
             </button>
-            <div id="pos-menu" class="accordion-content {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') ? '' : 'hidden' }} ml-4 sm:ml-8 mt-1 space-y-1">
+            <div id="pos-menu" class="accordion-content {{ request()->routeIs('pos.*') || request()->routeIs('cash-registers.*') || request()->routeIs('payments.*') || request()->routeIs('sales.*') || request()->routeIs('products.*') ? '' : 'hidden' }} ml-4 sm:ml-8 mt-1 space-y-1">
                 <a href="{{ route('pos.index') }}"
                    class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('pos.index') ? 'text-white font-bold' : 'text-red-100' }}">POS - Pagos Estudiantes</a>
                 <a href="{{ route('sales.pos') }}"
                    class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('sales.pos') ? 'text-white font-bold' : 'text-red-100' }}">POS - Productos/Servicios</a>
+                <a href="{{ route('products.index') }}"
+                   class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('products.*') ? 'text-white font-bold' : 'text-red-100' }}">Gestión de Productos</a>
                 <a href="{{ route('cash-registers.index') }}"
                    class="flex items-center px-4 py-2 rounded-sm text-xs hover:bg-white hover:bg-opacity-5 {{ request()->routeIs('cash-registers.*') ? 'text-white font-bold' : 'text-red-100' }}">Gestión de Caja</a>
                 <a href="{{ route('payments.index') }}"
