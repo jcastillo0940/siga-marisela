@@ -84,4 +84,28 @@ class AttendanceWebController extends Controller
 
         return view('attendance.student-report', compact('enrollment', 'stats'));
     }
+
+    /**
+     * Mostrar código QR del estudiante para check-in
+     */
+    public function showStudentQR($enrollmentId)
+    {
+        $enrollment = Enrollment::with(['student', 'courseOffering.course'])
+            ->findOrFail($enrollmentId);
+
+        $qrCode = $this->attendanceService->generateQRCode($enrollment);
+
+        return view('attendance.student-qr', compact('enrollment', 'qrCode'));
+    }
+
+    /**
+     * Vista para escanear códigos QR (profesor)
+     */
+    public function scanQR($sessionId)
+    {
+        $session = CourseOfferingDate::with(['courseOffering.course'])
+            ->findOrFail($sessionId);
+
+        return view('attendance.scan-qr', compact('session'));
+    }
 }

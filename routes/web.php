@@ -105,6 +105,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/session/{session}/store', [AttendanceWebController::class, 'store'])->name('store');
         Route::get('/offering/{offering}/report', [AttendanceWebController::class, 'courseReport'])->name('course-report');
         Route::get('/enrollment/{enrollment}/report', [AttendanceWebController::class, 'studentReport'])->name('student-report');
+        Route::get('/enrollment/{enrollment}/qr', [AttendanceWebController::class, 'showStudentQR'])->name('student-qr');
+        Route::get('/session/{session}/scan-qr', [AttendanceWebController::class, 'scanQR'])->name('scan-qr');
     });
 
     // Certificados
