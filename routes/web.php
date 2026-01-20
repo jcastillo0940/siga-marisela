@@ -13,6 +13,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\CashRegisterController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\PublicLeadController; // Movido arriba
 use App\Http\Controllers\Web\AttendanceWebController;
 use App\Http\Controllers\Web\CertificateWebController;
@@ -138,5 +139,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/accounts-receivable', [App\Http\Controllers\AccountsReceivableController::class, 'index'])->name('accounts-receivable');
         Route::get('/accounts-receivable/pdf', [App\Http\Controllers\AccountsReceivableController::class, 'exportPdf'])->name('accounts-receivable.pdf');
         Route::get('/accounts-receivable/excel', [App\Http\Controllers\AccountsReceivableController::class, 'exportExcel'])->name('accounts-receivable.excel');
+    });
+
+    // Dashboard del Estudiante
+    Route::prefix('student-dashboard')->name('student-dashboard.')->group(function () {
+        Route::get('/', [StudentDashboardController::class, 'select'])->name('select');
+        Route::get('/{student}', [StudentDashboardController::class, 'index'])->name('index');
+        Route::post('/{student}/request-course', [StudentDashboardController::class, 'requestCourse'])->name('request-course');
     });
 });
