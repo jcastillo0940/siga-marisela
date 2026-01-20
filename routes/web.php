@@ -160,5 +160,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/', [StudentDashboardController::class, 'select'])->name('select');
         Route::get('/{student}', [StudentDashboardController::class, 'index'])->name('index');
         Route::post('/{student}/request-course', [StudentDashboardController::class, 'requestCourse'])->name('request-course');
+        Route::post('/{student}/select-meal', [StudentDashboardController::class, 'selectMeal'])->name('select-meal');
     });
 });

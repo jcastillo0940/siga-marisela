@@ -6,6 +6,8 @@ use App\Models\Student;
 use App\Models\Enrollment;
 use App\Models\Payment;
 use App\Models\Certificate;
+use App\Models\CourseMaterial;
+use App\Models\MealMenu;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -73,13 +75,52 @@ class StudentDashboardController extends Controller
         }
         $upcomingSessions = $upcomingSessions->sortBy('session.session_date')->take(5);
 
+        // Material didáctico disponible
+        $materials = collect();
+        foreach ($activeEnrollments as $enrollment) {
+            $courseMaterials = CourseMaterial::where('course_offering_id', $enrollment->course_offering_id)
+                ->available()
+                ->ordered()
+                ->get();
+
+            foreach ($courseMaterials as $material) {
+                $materials->push([
+                    'material' => $material,
+                    'course' => $enrollment->courseOffering->course,
+                ]);
+            }
+        }
+
+        // Menús disponibles para selección
+        $availableMenus = collect();
+        foreach ($activeEnrollments as $enrollment) {
+            $menus = MealMenu::where('course_offering_id', $enrollment->course_offering_id)
+                ->with(['options' => function($query) {
+                    $query->active();
+                }])
+                ->active()
+                ->upcoming()
+                ->orderBy('meal_date')
+                ->get();
+
+            foreach ($menus as $menu) {
+                $availableMenus->push([
+                    'menu' => $menu,
+                    'enrollment' => $enrollment,
+                    'course' => $enrollment->courseOffering->course,
+                ]);
+            }
+        }
+
         return view('student-dashboard.index', compact(
             'student',
             'activeEnrollments',
             'payments',
             'certificates',
             'stats',
-            'upcomingSessions'
+            'upcomingSessions',
+            'materials',
+            'availableMenus'
         ));
     }
 
@@ -103,5 +144,54 @@ class StudentDashboardController extends Controller
         return redirect()
             ->route('student-dashboard.index', $student->id)
             ->with('success', 'Solicitud de inscripción enviada. Te contactaremos pronto.');
+    }
+
+    public function selectMeal(Request $request, $studentId)
+    {
+        $validated = $request->validate([
+            'meal_menu_id' => 'required|exists:meal_menus,id',
+            'meal_option_id' => 'required|exists:meal_options,id',
+            'enrollment_id' => 'required|exists:enrollments,id',
+            'notes' => 'nullable|string|max:250',
+        ]);
+
+        $student = Student::findOrFail($studentId);
+
+        // Verificar que la inscripción pertenece al estudiante
+        $enrollment = Enrollment::where('id', $validated['enrollment_id'])
+            ->where('student_id', $student->id)
+            ->firstOrFail();
+
+        $mealMenu = MealMenu::findOrFail($validated['meal_menu_id']);
+        $mealOption = MealOption::findOrFail($validated['meal_option_id']);
+
+        // Verificar disponibilidad
+        if (!$mealMenu->canSelect()) {
+            return redirect()
+                ->route('student-dashboard.index', $student->id)
+                ->with('error', 'Este menú ya no está disponible para selección.');
+        }
+
+        if (!$mealOption->isAvailable()) {
+            return redirect()
+                ->route('student-dashboard.index', $student->id)
+                ->with('error', 'Esta opción ya no está disponible.');
+        }
+
+        // Crear o actualizar la selección
+        \App\Models\MealSelection::updateOrCreate(
+            [
+                'enrollment_id' => $enrollment->id,
+                'meal_menu_id' => $mealMenu->id,
+            ],
+            [
+                'meal_option_id' => $mealOption->id,
+                'notes' => $validated['notes'],
+            ]
+        );
+
+        return redirect()
+            ->route('student-dashboard.index', $student->id)
+            ->with('success', 'Selección de menú guardada exitosamente.');
     }
 }
