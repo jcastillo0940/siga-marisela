@@ -8,11 +8,11 @@ use App\Http\Requests\Lead\StoreLeadRequest;
 use App\Http\Requests\Lead\UpdateLeadRequest;
 use App\Models\Lead;
 use App\Models\User;
-use App\Models\CourseOffering; // Importante para los selectores
+use App\Models\CourseOffering;
 use App\Services\LeadService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage; // Para manejo de archivos
+use Illuminate\Support\Facades\Storage;
 
 class LeadController extends Controller
 {
@@ -30,7 +30,6 @@ class LeadController extends Controller
     {
         $users = User::where('is_active', true)->get();
         
-        // Solución al error: Cargamos las ofertas para el dropdown de creación
         $courseOfferings = CourseOffering::with('course')
             ->where('is_active', true)
             ->get();
@@ -91,7 +90,6 @@ class LeadController extends Controller
         $lead = $this->leadService->getLeadById($id);
         $users = User::where('is_active', true)->get();
         
-        // Solución al error: Cargamos las ofertas para el dropdown de edición
         $courseOfferings = CourseOffering::with('course')
             ->where('is_active', true)
             ->get();
@@ -184,20 +182,25 @@ class LeadController extends Controller
             abort(403);
         }
 
+        // Validación actualizada con campos de plan de pagos
         $validated = $request->validate([
             'status' => 'required|in:verified,rejected',
-            'notes' => 'nullable|string'
+            'notes' => 'nullable|string',
+            'amount_paid' => 'required_if:status,verified|numeric|min:0.01',
+            'payment_type' => 'nullable|in:contado,cuotas',
+            'periodicity' => 'required_if:payment_type,cuotas|in:semanal,quincenal,mensual',
+            'number_of_installments' => 'required_if:payment_type,cuotas|integer|min:1',
         ]);
 
         try {
             $this->leadService->verifyPayment(
                 $lead->id, 
                 $validated['status'], 
-                $validated['notes']
+                $validated
             );
 
             $message = $validated['status'] === 'verified' 
-                ? 'Pago verificado. Lead convertido en estudiante automáticamente.' 
+                ? 'Pago verificado. Lead convertido en estudiante e inscrito al curso exitosamente.' 
                 : 'El pago ha sido rechazado.';
 
             return redirect()->route('leads.show', $lead->id)->with('success', $message);

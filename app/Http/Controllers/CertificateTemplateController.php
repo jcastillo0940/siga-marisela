@@ -76,51 +76,49 @@ class CertificateTemplateController extends Controller
     }
 
     public function update(Request $request, CertificateTemplate $certificateTemplate)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:course,workshop,seminar,other',
-            'description' => 'nullable|string',
-            'orientation' => 'required|in:portrait,landscape',
-            'size' => 'required|in:A4,Letter',
-            'background_image' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
-            'html_template' => 'required|string',
-            'css_styles' => 'nullable|string',
-            'min_attendance_percentage' => 'required|numeric|min:0|max:100',
-            'requires_payment_complete' => 'boolean',
-            'requires_all_sessions' => 'boolean',
-            'is_active' => 'boolean',
-            'is_default' => 'boolean',
-        ]);
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'type' => 'required|in:course,workshop,seminar,certificate,other',
+        'description' => 'nullable|string',
+        'orientation' => 'required|in:portrait,landscape',
+        'size' => 'required|in:A4,Letter',
+        'background_image' => 'nullable|image|mimes:jpeg,png,jpg|max:5120',
+        'html_template' => 'required|string',
+        'css_styles' => 'nullable|string',
+        'min_attendance_percentage' => 'required|numeric|min:0|max:100',
+        'requires_payment_complete' => 'nullable|boolean',
+        'requires_all_sessions' => 'nullable|boolean',
+        'is_active' => 'nullable|boolean',
+        'is_default' => 'nullable|boolean',
+    ]);
 
-        // Handle checkboxes
-        $validated['requires_payment_complete'] = $request->has('requires_payment_complete');
-        $validated['requires_all_sessions'] = $request->has('requires_all_sessions');
-        $validated['is_active'] = $request->has('is_active');
-        $validated['is_default'] = $request->has('is_default');
+    // Convert checkboxes (they come as "0" or "1" strings)
+    $validated['requires_payment_complete'] = $request->input('requires_payment_complete', 0) == 1;
+    $validated['requires_all_sessions'] = $request->input('requires_all_sessions', 0) == 1;
+    $validated['is_active'] = $request->input('is_active', 0) == 1;
+    $validated['is_default'] = $request->input('is_default', 0) == 1;
 
-        // Handle background image upload
-        if ($request->hasFile('background_image')) {
-            // Delete old image if exists
-            if ($certificateTemplate->background_image) {
-                Storage::disk('public')->delete($certificateTemplate->background_image);
-            }
-            $path = $request->file('background_image')->store('certificates/backgrounds', 'public');
-            $validated['background_image'] = $path;
+    // Handle background image upload
+    if ($request->hasFile('background_image')) {
+        if ($certificateTemplate->background_image) {
+            Storage::disk('public')->delete($certificateTemplate->background_image);
         }
-
-        // If this is set as default, unset all other defaults
-        if ($validated['is_default'] && !$certificateTemplate->is_default) {
-            CertificateTemplate::where('is_default', true)
-                ->where('id', '!=', $certificateTemplate->id)
-                ->update(['is_default' => false]);
-        }
-
-        $certificateTemplate->update($validated);
-
-        return redirect()->route('certificate-templates.index')
-            ->with('success', 'Plantilla actualizada exitosamente');
+        $validated['background_image'] = $request->file('background_image')->store('certificates/backgrounds', 'public');
     }
+
+    // If this is set as default, unset all other defaults
+    if ($validated['is_default']) {
+        CertificateTemplate::where('is_default', true)
+            ->where('id', '!=', $certificateTemplate->id)
+            ->update(['is_default' => false]);
+    }
+
+    $certificateTemplate->update($validated);
+
+    return redirect()->route('certificate-templates.index')
+        ->with('success', 'Plantilla actualizada exitosamente');
+}
 
     public function destroy(CertificateTemplate $certificateTemplate)
     {

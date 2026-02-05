@@ -19,6 +19,12 @@
         @csrf
         @method('PUT')
 
+        <!-- Hidden fields for checkboxes -->
+        <input type="hidden" name="requires_payment_complete" value="0">
+        <input type="hidden" name="requires_all_sessions" value="0">
+        <input type="hidden" name="is_active" value="0">
+        <input type="hidden" name="is_default" value="0">
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Column - Settings -->
             <div class="lg:col-span-1 space-y-6">
@@ -104,12 +110,12 @@
                         </div>
 
                         <label class="flex items-center space-x-3 cursor-pointer">
-                            <input type="checkbox" name="requires_payment_complete" class="w-5 h-5 text-accent-red rounded" {{ old('requires_payment_complete', $certificateTemplate->requires_payment_complete) ? 'checked' : '' }}>
+                            <input type="checkbox" name="requires_payment_complete" value="1" class="w-5 h-5 text-accent-red rounded" {{ old('requires_payment_complete', $certificateTemplate->requires_payment_complete) ? 'checked' : '' }}>
                             <span class="text-sm text-gray-700">Requiere pago completo</span>
                         </label>
 
                         <label class="flex items-center space-x-3 cursor-pointer">
-                            <input type="checkbox" name="requires_all_sessions" class="w-5 h-5 text-accent-red rounded" {{ old('requires_all_sessions', $certificateTemplate->requires_all_sessions) ? 'checked' : '' }}>
+                            <input type="checkbox" name="requires_all_sessions" value="1" class="w-5 h-5 text-accent-red rounded" {{ old('requires_all_sessions', $certificateTemplate->requires_all_sessions) ? 'checked' : '' }}>
                             <span class="text-sm text-gray-700">Requiere asistencia a todas las sesiones</span>
                         </label>
                     </div>
@@ -121,12 +127,12 @@
 
                     <div class="space-y-3">
                         <label class="flex items-center space-x-3 cursor-pointer">
-                            <input type="checkbox" name="is_active" class="w-5 h-5 text-accent-red rounded" {{ old('is_active', $certificateTemplate->is_active) ? 'checked' : '' }}>
+                            <input type="checkbox" name="is_active" value="1" class="w-5 h-5 text-accent-red rounded" {{ old('is_active', $certificateTemplate->is_active) ? 'checked' : '' }}>
                             <span class="text-sm text-gray-700">Plantilla activa</span>
                         </label>
 
                         <label class="flex items-center space-x-3 cursor-pointer">
-                            <input type="checkbox" name="is_default" class="w-5 h-5 text-accent-red rounded" {{ old('is_default', $certificateTemplate->is_default) ? 'checked' : '' }}>
+                            <input type="checkbox" name="is_default" value="1" class="w-5 h-5 text-accent-red rounded" {{ old('is_default', $certificateTemplate->is_default) ? 'checked' : '' }}>
                             <span class="text-sm text-gray-700">Establecer como predeterminada</span>
                         </label>
                     </div>
@@ -168,7 +174,7 @@
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
                         @foreach($availableVariables as $key => $description)
                         <div class="bg-white p-2 rounded border border-blue-200">
-                            <code class="text-blue-600 font-semibold">{{ '{{ ' . $key . ' }}' }}</code>
+                            <code class="text-blue-600 font-semibold">@{{ {{ $key }} }}</code>
                             <p class="text-gray-600 text-xs mt-1">{{ $description }}</p>
                         </div>
                         @endforeach

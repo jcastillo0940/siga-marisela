@@ -1,7 +1,7 @@
 <?php
 use App\Http\Controllers\Api\AuthApiController;
-use App\Http\Controllers\Api\RoleApiController;
-use App\Http\Controllers\Api\UserApiController;
+// use App\Http\Controllers\Api\RoleApiController; // ⚠️ COMENTADO - No existe
+// use App\Http\Controllers\Api\UserApiController; // ⚠️ COMENTADO - No existe
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\CertificateTemplateController;
@@ -27,7 +27,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthApiController::class, 'logout'])->name('api.logout');
     Route::get('/auth/me', [AuthApiController::class, 'me'])->name('api.me');
     
-    // Users API 
+    // Users API - COMENTADO TEMPORALMENTE (Controller no existe)
+    /*
     Route::apiResource('users', UserApiController::class)->names([
         'index'   => 'api.users.index',
         'store'   => 'api.users.store',
@@ -38,8 +39,10 @@ Route::middleware('auth:sanctum')->group(function () {
     
     Route::patch('users/{user}/toggle-status', [UserApiController::class, 'toggleStatus'])
         ->name('api.users.toggle-status');
+    */
     
-    // Roles API
+    // Roles API - COMENTADO TEMPORALMENTE (Controller no existe)
+    /*
     Route::apiResource('roles', RoleApiController::class)->names([
         'index'   => 'api.roles.index',
         'store'   => 'api.roles.store',
@@ -47,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
         'update'  => 'api.roles.update',
         'destroy' => 'api.roles.destroy',
     ]);
+    */
     
     // Kommo Webhook
     Route::post('/kommo/webhook', [App\Http\Controllers\Api\KommoWebhookController::class, 'handle'])

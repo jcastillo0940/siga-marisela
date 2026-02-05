@@ -67,6 +67,48 @@ class CourseOffering extends Model
         return $this->hasMany(CourseOfferingDate::class);
     }
 
+    public function mealMenus()
+    {
+        return $this->hasMany(MealMenu::class);
+    }
+
+    // =========================================================
+    // SCOPES (NUEVO - Para el módulo de menús)
+    // =========================================================
+    
+    /**
+     * Scope para obtener solo course offerings activos
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Scope para obtener course offerings próximos (que no han terminado)
+     */
+    public function scopeUpcoming($query)
+    {
+        return $query->where('end_date', '>=', today());
+    }
+
+    /**
+     * Scope para obtener course offerings en progreso
+     */
+    public function scopeInProgress($query)
+    {
+        return $query->where('start_date', '<=', today())
+            ->where('end_date', '>=', today());
+    }
+
+    /**
+     * Scope para filtrar por estado
+     */
+    public function scopeByStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
     // Accessors Existentes
     public function getFormattedPriceAttribute(): string
     {
@@ -126,6 +168,24 @@ class CourseOffering extends Model
         $hora = $this->start_time_friendly;
 
         return "{$this->location} — {$fecha} a las {$hora}";
+    }
+
+    /**
+     * Accessor para generation_number (compatibilidad con vistas)
+     * Extrae el número de generación desde generation_name
+     */
+    public function getGenerationNumberAttribute(): ?string
+    {
+        if (!$this->generation_name) {
+            return null;
+        }
+        
+        // Si generation_name es "Gen 19" o "Generación 19", extrae "19"
+        if (preg_match('/(\d+)/', $this->generation_name, $matches)) {
+            return $matches[1];
+        }
+        
+        return $this->generation_name;
     }
 
     // Boot method para generar código automático

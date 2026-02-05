@@ -62,13 +62,32 @@ class EnrollmentService
 
             // Crear plan de pagos si se proporcionan datos
             if (!empty($paymentPlanData)) {
-                $this->paymentPlanService->createPaymentPlan(
-                    enrollmentId: $enrollment->id,
-                    paymentType: $paymentPlanData['payment_type'],
-                    totalAmount: $paymentPlanData['total_amount'],
-                    periodicity: $paymentPlanData['periodicity'] ?? null,
-                    numberOfInstallments: $paymentPlanData['number_of_installments'] ?? null
-                );
+                $paymentType = $paymentPlanData['payment_type'] ?? 'contado';
+                $totalAmount = $paymentPlanData['total_amount'] ?? $dto->price_paid;
+                $amountPaid = $paymentPlanData['amount_paid'] ?? 0;
+                
+                // Determinar si es pago completo o tiene plan de cuotas
+                if ($paymentType === 'contado' || $amountPaid >= $totalAmount) {
+                    // Pago completo - crear plan sin cuotas pendientes
+                    $this->paymentPlanService->createPaymentPlan(
+                        enrollmentId: $enrollment->id,
+                        paymentType: 'contado',
+                        totalAmount: $totalAmount,
+                        amountPaid: $amountPaid > 0 ? $amountPaid : $totalAmount,
+                        periodicity: null,
+                        numberOfInstallments: null
+                    );
+                } else {
+                    // Pago parcial - crear plan con cuotas
+                    $this->paymentPlanService->createPaymentPlan(
+                        enrollmentId: $enrollment->id,
+                        paymentType: 'cuotas',
+                        totalAmount: $totalAmount,
+                        amountPaid: $amountPaid,
+                        periodicity: $paymentPlanData['periodicity'] ?? null,
+                        numberOfInstallments: $paymentPlanData['number_of_installments'] ?? null
+                    );
+                }
             }
 
             return $enrollment->fresh(['paymentPlan.schedules']);
@@ -127,7 +146,7 @@ class EnrollmentService
             ->get();
 
         if ($activeEnrollments->isEmpty()) {
-            return; // No hay cursos activos, no puede haber conflicto
+            return;
         }
 
         // Cargar las fechas del curso nuevo
@@ -135,7 +154,7 @@ class EnrollmentService
         $newDates = $newOffering->dates()->where('is_cancelled', false)->get();
 
         if ($newDates->isEmpty()) {
-            return; // Si no tiene fechas programadas, no hay conflicto posible
+            return;
         }
 
         // Verificar conflictos con cada curso activo
@@ -178,28 +197,18 @@ class EnrollmentService
 
     /**
      * Verifica si dos rangos de tiempo se superponen
-     *
-     * @param string|null $start1 Hora inicio 1 (HH:MM:SS)
-     * @param string|null $end1 Hora fin 1 (HH:MM:SS)
-     * @param string|null $start2 Hora inicio 2 (HH:MM:SS)
-     * @param string|null $end2 Hora fin 2 (HH:MM:SS)
-     * @return bool
      */
     private function hasTimeOverlap(?string $start1, ?string $end1, ?string $start2, ?string $end2): bool
     {
-        // Si alguno no tiene horarios definidos, no podemos verificar overlap
         if (!$start1 || !$end1 || !$start2 || !$end2) {
-            return false; // No hay suficiente información para determinar conflicto
+            return false;
         }
 
-        // Convertir a Carbon para comparación
         $start1Carbon = \Carbon\Carbon::createFromFormat('H:i:s', $start1);
         $end1Carbon = \Carbon\Carbon::createFromFormat('H:i:s', $end1);
         $start2Carbon = \Carbon\Carbon::createFromFormat('H:i:s', $start2);
         $end2Carbon = \Carbon\Carbon::createFromFormat('H:i:s', $end2);
 
-        // Verificar overlap:
-        // Hay overlap si el inicio de uno está antes del fin del otro Y viceversa
         return $start1Carbon->lt($end2Carbon) && $start2Carbon->lt($end1Carbon);
     }
 }

@@ -15,9 +15,11 @@ use App\Http\Controllers\SaleController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\CertificateTemplateController;
-use App\Http\Controllers\PublicLeadController; // Movido arriba
+use App\Http\Controllers\PublicLeadController;
 use App\Http\Controllers\Web\AttendanceWebController;
 use App\Http\Controllers\Web\CertificateWebController;
+use App\Http\Controllers\UnifiedPosController;
+use App\Http\Controllers\MealMenuController;
 use Illuminate\Support\Facades\Route;
 
 // =========================================================
@@ -40,7 +42,6 @@ Route::get('api/courses/{course}/offerings', [PublicLeadController::class, 'getO
 // Verificación pública de certificados (QR)
 Route::get('certificates/verify/{number}/{code}', [CertificateWebController::class, 'verify'])->name('certificates.verify');
 
-
 // =========================================================
 // RUTAS PRIVADAS (Requieren autenticación)
 // =========================================================
@@ -62,7 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('students/{student}/toggle-status', [StudentController::class, 'toggleStatus'])->name('students.toggle-status');
     Route::resource('students', StudentController::class);
     
-    // Leads (CORREGIDO: Ahora dentro de auth)
+    // Leads
     Route::post('leads/{lead}/verify-payment', [LeadController::class, 'verifyPayment'])->name('leads.verify-payment');
     Route::post('leads/{lead}/convert', [LeadController::class, 'convertToStudent'])->name('leads.convert');
     Route::resource('leads', LeadController::class);
@@ -98,8 +99,12 @@ Route::middleware('auth')->group(function () {
     Route::get('cash-registers/{id}/corte-x', [CashRegisterController::class, 'corteX'])->name('cash-registers.corte-x');
     Route::get('cash-registers/{id}/report-pdf', [CashRegisterController::class, 'downloadReportPdf'])->name('cash-registers.report-pdf');
     
-    // POS
+    // POS Clásico
     Route::get('pos', [PaymentController::class, 'pos'])->name('pos.index');
+
+    // POS Unificado
+    Route::get('/pos-unified', [UnifiedPosController::class, 'index'])->name('pos.unified');
+    Route::get('/pos-unified/search', [UnifiedPosController::class, 'search'])->name('pos.unified.search');
 
     // Ventas genéricas (productos/servicios)
     Route::prefix('sales')->name('sales.')->group(function () {
@@ -113,6 +118,25 @@ Route::middleware('auth')->group(function () {
     // Productos y Servicios
     Route::patch('products/{product}/toggle-status', [ProductController::class, 'toggleStatus'])->name('products.toggle-status');
     Route::resource('products', ProductController::class);
+
+    // =========================================================
+    // MENÚS DE COMIDA (Gestión administrativa)
+    // =========================================================
+    Route::prefix('meal-menus')->name('meal-menus.')->group(function () {
+        // CRUD de menús
+        Route::get('/', [MealMenuController::class, 'index'])->name('index');
+        Route::get('/create', [MealMenuController::class, 'create'])->name('create');
+        Route::post('/', [MealMenuController::class, 'store'])->name('store');
+        Route::get('/{mealMenu}', [MealMenuController::class, 'show'])->name('show');
+        Route::get('/{mealMenu}/edit', [MealMenuController::class, 'edit'])->name('edit');
+        Route::put('/{mealMenu}', [MealMenuController::class, 'update'])->name('update');
+        Route::delete('/{mealMenu}', [MealMenuController::class, 'destroy'])->name('destroy');
+        
+        // Acciones adicionales
+        Route::post('/{mealMenu}/send-notifications', [MealMenuController::class, 'sendNotifications'])->name('send-notifications');
+        Route::get('/{mealMenu}/report', [MealMenuController::class, 'generateReport'])->name('report');
+        Route::get('/{mealMenu}/report-pdf', [MealMenuController::class, 'downloadReportPdf'])->name('report-pdf');
+    });
 
     // Asistencia
     Route::prefix('attendance')->name('attendance.')->group(function () {
@@ -143,7 +167,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{certificateTemplate}', [CertificateTemplateController::class, 'show'])->name('show');
         Route::get('/{certificateTemplate}/edit', [CertificateTemplateController::class, 'edit'])->name('edit');
         Route::put('/{certificateTemplate}', [CertificateTemplateController::class, 'update'])->name('update');
-        Route::delete('/{certificateTemplate}', [CertificateTemplateController::class, 'destroy'])->name('destroy');
+        Route::delete('/{certificateTemplate}', [CertificateTemplateController::class, 'destroy'])->name('destroy'); // ⚠️ CORREGIDO: era CertificateTemplateTemplate
         Route::get('/{certificateTemplate}/preview', [CertificateTemplateController::class, 'preview'])->name('preview');
         Route::post('/{certificateTemplate}/duplicate', [CertificateTemplateController::class, 'duplicate'])->name('duplicate');
     });

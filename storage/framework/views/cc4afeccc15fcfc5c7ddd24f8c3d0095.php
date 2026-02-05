@@ -1,5 +1,3 @@
-
-
 <?php $__env->startSection('title', 'Pagos Registrados'); ?>
 <?php $__env->startSection('page-title', 'Historial de Pagos'); ?>
 
@@ -186,7 +184,14 @@
                             <!-- Payment Method -->
                             <td>
                                 <span class="text-sm text-gray-600"><?php echo e($payment->payment_method_label); ?></span>
-                                <?php if($payment->reference_number): ?>
+                                <?php if($payment->payment_method === 'multiple' && $payment->paymentMethods->isNotEmpty()): ?>
+                                    <p class="text-xs text-blue-600 mt-1">
+                                        <svg class="w-3 h-3 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                        </svg>
+                                        <?php echo e($payment->paymentMethods->count()); ?> métodos
+                                    </p>
+                                <?php elseif($payment->reference_number): ?>
                                     <p class="text-xs text-gray-400">Ref: <?php echo e($payment->reference_number); ?></p>
                                 <?php endif; ?>
                             </td>
