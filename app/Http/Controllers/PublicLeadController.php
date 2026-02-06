@@ -36,13 +36,13 @@ class PublicLeadController extends Controller
 
     /**
      * Retorna las ofertas para un curso específico.
-     * Utiliza el Accessor "public_schedule_label" definido en el modelo CourseOffering.
+     * Ahora incluye si tiene reglas de precios activas.
      */
     public function getOfferings(Course $course)
     {
         try {
             $offerings = $course->offerings()
-                ->with(['dates'])
+                ->with(['dates', 'pricingRules']) // Cargar reglas de precios
                 ->where('is_active', true)
                 ->whereIn('status', ['programado', 'en_curso'])
                 // Verificar que la PRIMERA clase no cancelada sea en el futuro
@@ -53,11 +53,17 @@ class PublicLeadController extends Controller
                     return $offering->available_spots > 0;
                 })
                 ->map(function ($offering) {
+                    // Verificar si tiene reglas activas para grupos (mínimo 2 personas)
+                    $hasRules = $offering->pricingRules->where('is_active', true)
+                        ->where('min_students', '>=', 2)
+                        ->isNotEmpty();
+
                     return [
                         'id' => $offering->id,
-                        'display' => $offering->public_schedule_label
+                        'display' => $offering->public_schedule_label,
+                        'has_pricing_rules' => $hasRules // <--- Nueva bandera crítica
                     ];
-                });
+                })->values();
 
             return response()->json($offerings);
         } catch (\Exception $e) {
@@ -66,12 +72,49 @@ class PublicLeadController extends Controller
     }
 
     /**
-     * Procesa el envío del formulario.
+     * API: Calcula el precio total y descuentos según reglas
+     */
+    public function calculatePrice(Request $request)
+    {
+        $request->validate([
+            'course_offering_id' => 'required|exists:course_offerings,id',
+            'student_count' => 'required|integer|min:1',
+        ]);
+
+        $offering = CourseOffering::with('pricingRules')->find($request->course_offering_id);
+        $count = $request->student_count;
+        $originalPrice = $offering->price;
+        
+        // Buscar la mejor regla aplicable
+        $rule = $offering->getBestPricingRule($count);
+        
+        if ($rule) {
+            $pricePerStudent = $rule->calculatePricePerStudent($originalPrice, $count);
+            $total = $pricePerStudent * $count;
+            $appliedRuleName = $rule->name ?: 'Descuento por grupo';
+        } else {
+            $pricePerStudent = $originalPrice;
+            $total = $originalPrice * $count;
+            $appliedRuleName = null;
+        }
+
+        return response()->json([
+            'original_price' => $originalPrice,
+            'price_per_student' => $pricePerStudent,
+            'total' => $total,
+            'applied_rule' => $appliedRuleName,
+            'savings' => ($originalPrice * $count) - $total
+        ]);
+    }
+
+    /**
+     * Guarda el lead (o los leads grupales)
      */
     public function store(Request $request)
     {
-        // 1. Validación: Se quitó el "unique:leads,email" para permitir múltiples intereses.
+        // 1. Validación ampliada para soportar compañeros
         $validated = $request->validate([
+            // Datos del estudiante principal
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
             'email' => 'required|email',
@@ -89,11 +132,24 @@ class PublicLeadController extends Controller
             'occupation' => 'required|string',
             'social_media_handle' => 'nullable|string',
             'medical_notes_lead' => 'nullable|string',
+            
+            // Datos comunes
             'payment_receipt' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
+            'notes' => 'nullable|string',
+            
+            // Datos de compañeros (array)
+            'partners' => 'nullable|array',
+            'partners.*.first_name' => 'required|string|max:255',
+            'partners.*.last_name' => 'required|string|max:255',
+            'partners.*.email' => 'required|email',
+            'partners.*.phone' => 'nullable|string|max:20',
+            'partners.*.age' => 'required|numeric',
+            'partners.*.birth_date_text' => 'required|date',
+            'partners.*.who_fills_form' => 'nullable|in:Alumna,Madre/Padre,Tutor',
         ]);
 
         // 2. Validar que el curso tenga fechas futuras y cupos disponibles
-        $offering = CourseOffering::with('dates')->find($validated['course_offering_id']);
+        $offering = CourseOffering::with(['dates', 'pricingRules'])->find($validated['course_offering_id']);
 
         if (!$offering) {
             return back()->withInput()->with('error', 'La programación seleccionada no existe.');
@@ -109,9 +165,13 @@ class PublicLeadController extends Controller
             return back()->withInput()->with('error', 'Este curso ya inició o no tiene clases programadas. Por favor selecciona otro curso.');
         }
 
-        // Verificar que tenga cupos disponibles
-        if ($offering->available_spots <= 0) {
-            return back()->withInput()->with('error', 'Este curso ya alcanzó su capacidad máxima. Por favor selecciona otro curso.');
+        // Calcular total de estudiantes (1 principal + N compañeros)
+        $partners = $request->input('partners', []);
+        $totalStudents = 1 + count($partners);
+
+        // Verificar cupos disponibles
+        if ($offering->available_spots < $totalStudents) {
+            return back()->withInput()->with('error', "Solo quedan {$offering->available_spots} cupos disponibles en este curso.");
         }
 
         // Si no se proporciona who_fills_form (persona mayor de edad), establecer valor por defecto
@@ -119,10 +179,47 @@ class PublicLeadController extends Controller
             $validated['who_fills_form'] = 'Alumna';
         }
 
+        // =========================================================================
+        // VALIDACIÓN DE DUPLICADOS (CORREGIDA)
+        // =========================================================================
+        // 1. Buscamos si el estudiante ya existe en el sistema
+        $existingStudent = \App\Models\Student::where('email', $validated['email'])->first();
+
+        if ($existingStudent) {
+            // 2. Verificamos inscripción SOLO para este 'course_offering_id' específico
+            $alreadyEnrolled = \App\Models\Enrollment::where('student_id', $existingStudent->id)
+                ->where('course_offering_id', $validated['course_offering_id'])
+                ->whereIn('status', ['inscrito', 'en_curso', 'completado'])
+                ->exists();
+
+            if ($alreadyEnrolled) {
+                return back()
+                    ->withInput()
+                    ->with('error', 'Ya tienes una inscripción activa o completada para esta fecha/generación específica. Puedes registrarte en otros cursos, pero no repetir el mismo.');
+            }
+        }
+
+        // 3. Opcional: Evitar duplicar LEADS pendientes
+        $pendingLead = \App\Models\Lead::where('email', $validated['email'])
+            ->where('course_offering_id', $validated['course_offering_id'])
+            ->whereIn('status', ['nuevo', 'contactado', 'en_proceso'])
+            ->exists();
+
+        if ($pendingLead) {
+            return back()
+                ->withInput()
+                ->with('error', 'Ya recibimos tu solicitud para este curso y la estamos procesando. No es necesario enviarla de nuevo.');
+        }
+        // =========================================================================
+
+        // Calcular precio real a aplicar según reglas de grupo
+        $rule = $offering->getBestPricingRule($totalStudents);
+        $pricePerStudent = $rule ? $rule->calculatePricePerStudent($offering->price, $totalStudents) : $offering->price;
+
         DB::beginTransaction();
 
         try {
-            // 2. Gestión de Archivos
+            // Gestión de Archivos
             $photoPath = $request->hasFile('student_photo') 
                 ? $request->file('student_photo')->store('leads/photos', 'public') 
                 : null;
@@ -130,14 +227,17 @@ class PublicLeadController extends Controller
             $receiptPath = $request->hasFile('payment_receipt') 
                 ? $request->file('payment_receipt')->store('leads/payments', 'public') 
                 : null;
+            
+            // Generar código de grupo único (solo si hay compañeros)
+            $groupCode = count($partners) > 0 ? 'GRP-' . strtoupper(uniqid()) : null;
 
-            // 3. Creación del DTO para el servicio
+            // --- 1. Crear Lead Principal ---
             $dto = new CreateLeadDTO(
                 first_name: $validated['first_name'],
                 last_name: $validated['last_name'],
                 email: $validated['email'],
                 phone: $validated['phone'],
-                source: 'web',
+                source: count($partners) > 0 ? 'web_group' : 'web',
                 status: 'nuevo',
                 student_photo: $photoPath,
                 who_fills_form: $validated['who_fills_form'],
@@ -156,13 +256,58 @@ class PublicLeadController extends Controller
                 course_offering_id: $validated['course_offering_id']
             );
 
-            // 4. Registro a través del Servicio
-            $this->leadService->createLead($dto);
+            $mainLead = $this->leadService->createLead($dto);
+
+            // Actualizar campos específicos de grupo
+            if ($groupCode) {
+                $mainLead->update([
+                    'group_code' => $groupCode,
+                    'notes' => "Líder del grupo. Inscripción de {$totalStudents} personas. Precio acordado: \${$pricePerStudent} c/u. " . ($validated['notes'] ?? ''),
+                ]);
+            }
+
+            // --- 2. Crear Leads de Compañeros ---
+            foreach ($partners as $index => $partnerData) {
+                $partnerDto = new CreateLeadDTO(
+                    first_name: $partnerData['first_name'],
+                    last_name: $partnerData['last_name'],
+                    email: $partnerData['email'],
+                    phone: $partnerData['phone'] ?? $validated['phone'],
+                    source: 'web_group',
+                    status: 'nuevo',
+                    student_photo: null,
+                    who_fills_form: $partnerData['who_fills_form'] ?? 'Alumna',
+                    age: (string)$partnerData['age'],
+                    birth_date_text: $partnerData['birth_date_text'],
+                    address_full: $validated['address_full'],
+                    parent_name: null,
+                    parent_phone: null,
+                    parent_relationship: null,
+                    parent_occupation: null,
+                    occupation: 'Estudiante',
+                    social_media_handle: null,
+                    medical_notes_lead: null,
+                    payment_receipt_path: $receiptPath,
+                    payment_status: 'pending',
+                    course_offering_id: $validated['course_offering_id']
+                );
+
+                $partnerLead = $this->leadService->createLead($partnerDto);
+
+                $partnerLead->update([
+                    'group_code' => $groupCode,
+                    'notes' => "Compañero de grupo de {$validated['first_name']} {$validated['last_name']}. Precio acordado: \${$pricePerStudent} c/u.",
+                ]);
+            }
 
             DB::commit();
 
+            $message = count($partners) > 0 
+                ? "¡Inscripción grupal recibida! Hemos registrado a las {$totalStudents} personas correctamente."
+                : 'Tu registro y comprobante han sido recibidos. Validaremos tu pago en breve.';
+
             return redirect()->route('public.register.success')
-                ->with('success', 'Tu registro y comprobante han sido recibidos. Validaremos tu pago en breve.');
+                ->with('success', $message);
 
         } catch (\Exception $e) {
             DB::rollBack();

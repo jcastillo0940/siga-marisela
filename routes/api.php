@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\CertificateTemplateController;
+use App\Http\Controllers\PublicLeadController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,6 +16,9 @@ use Illuminate\Support\Facades\Route;
 
 // Public API Routes
 Route::post('/auth/login', [AuthApiController::class, 'login'])->name('api.login');
+
+// API para calcular precio en tiempo real (pública)
+Route::post('/public/calculate-price', [PublicLeadController::class, 'calculatePrice'])->name('api.public.calculate-price');
 
 // Verificación pública de certificados (sin autenticación)
 Route::post('certificates/verify', [CertificateController::class, 'verify'])
@@ -99,4 +103,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('create-default', [CertificateTemplateController::class, 'createDefault'])->name('create-default');
         Route::delete('{template}', [CertificateTemplateController::class, 'destroy'])->name('destroy');
     });
+    
+    
 });

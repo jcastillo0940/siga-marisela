@@ -6,11 +6,37 @@ use App\Models\Student;
 use App\Models\MealMenu;
 use App\Models\MealSelection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class StudentDashboardController extends Controller
 {
     /**
-     * Show student selection page
+     * Lógica principal de redirección:
+     * Si es alumno, va directo a su dashboard.
+     * Si es admin/staff, va a la selección de alumno.
+     */
+    public function root()
+    {
+        $user = Auth::user();
+
+        // 1. Si el usuario es estudiante y tiene perfil asociado, ir directo a su dashboard
+        if ($user->hasRole('student')) {
+            if ($user->student) {
+                return $this->index($user->student);
+            }
+            abort(403, 'Tu usuario no tiene un perfil de estudiante asociado.');
+        }
+
+        // 2. Si es personal administrativo, permitir seleccionar estudiante
+        if ($user->hasAnyRole(['super-admin', 'admin', 'staff'])) {
+            return $this->select();
+        }
+
+        abort(403, 'No tienes permisos para acceder al dashboard de estudiantes.');
+    }
+
+    /**
+     * Show student selection page (Para Admins/Staff)
      */
     public function select()
     {
@@ -26,12 +52,20 @@ class StudentDashboardController extends Controller
      */
     public function index(Student $student)
     {
+        $user = Auth::user();
+
+        // SEGURIDAD: Evitar que un estudiante vea el dashboard de otro
+        // Si el usuario logueado es estudiante, verificar que el ID coincida
+        if ($user->hasRole('student') && $user->student && $user->student->id !== $student->id) {
+            abort(403, 'No estás autorizado para ver la información de este estudiante.');
+        }
+
         // Cargar relaciones necesarias
         $student->load([
             'enrollments' => function ($query) {
                 $query->whereIn('status', ['active', 'completed'])
                     ->with([
-                        'courseOffering.course',
+                        'courseOffering.course.materials',
                         'courseOffering.sessions',
                         'paymentPlan.schedules',
                         'attendances'
@@ -53,39 +87,58 @@ class StudentDashboardController extends Controller
         // Inscripciones activas
         $activeEnrollments = $student->enrollments->where('status', 'active');
 
-        // Próximas sesiones
-        $upcomingSessions = [];
+        // --- CORRECCIÓN: Próximas sesiones como Collection ---
+        $upcomingSessionsData = [];
         foreach ($activeEnrollments as $enrollment) {
-            foreach ($enrollment->courseOffering->sessions->where('session_date', '>=', today())->sortBy('session_date')->take(3) as $session) {
-                $upcomingSessions[] = [
+            $futureSessions = $enrollment->courseOffering->sessions
+                ->where('session_date', '>=', today())
+                ->sortBy('session_date')
+                ->take(3);
+
+            foreach ($futureSessions as $session) {
+                $upcomingSessionsData[] = [
                     'enrollment' => $enrollment,
                     'session' => $session,
                     'course' => $enrollment->courseOffering->course,
                 ];
             }
         }
+        // IMPORTANTE: Convertir a Collection y ordenar
+        $upcomingSessions = collect($upcomingSessionsData)
+            ->sortBy(function ($item) {
+                return $item['session']->session_date;
+            })
+            ->take(3)
+            ->values(); // Reindexa la colección
 
         // Pagos recientes
-        $payments = $student->enrollments->flatMap->paymentPlan->flatMap->schedules
+        $payments = $student->enrollments
+            ->flatMap->paymentPlan
+            ->flatMap->schedules
             ->where('status', 'paid')
             ->sortByDesc('paid_at')
             ->take(5);
 
         // Certificados
-        $certificates = $student->certificates()->with('course')->latest()->get();
+        $certificates = $student->certificates()
+            ->with('course')
+            ->latest()
+            ->get();
 
-        // Material didáctico
-        $materials = [];
+        // --- CORRECCIÓN: Material didáctico como Collection ---
+        $materialsData = [];
         foreach ($activeEnrollments as $enrollment) {
-            if ($enrollment->courseOffering->course->materials) {
-                foreach ($enrollment->courseOffering->course->materials as $material) {
-                    $materials[] = [
-                        'material' => $material,
-                        'course' => $enrollment->courseOffering->course,
-                    ];
-                }
+            $courseMaterials = $enrollment->courseOffering->course->materials ?? collect();
+            
+            foreach ($courseMaterials as $material) {
+                $materialsData[] = [
+                    'material' => $material,
+                    'course' => $enrollment->courseOffering->course,
+                ];
             }
         }
+        // IMPORTANTE: Convertir a Collection
+        $materials = collect($materialsData);
 
         // Menús disponibles para selección
         $availableMenus = $this->getAvailableMenusForStudent($student);
@@ -103,11 +156,13 @@ class StudentDashboardController extends Controller
     }
 
     /**
-     * Request course enrollment (método existente)
+     * Request course enrollment
      */
     public function requestCourse(Request $request, Student $student)
     {
-        // Tu implementación existente...
+        // Redirigir al formulario público de leads o crear una solicitud interna
+        // Por ahora redirigimos a la ruta de leads públicos
+        return redirect()->route('public.leads.create');
     }
 
     /**

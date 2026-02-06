@@ -76,6 +76,11 @@ Route::middleware('auth')->group(function () {
     Route::patch('course-offerings/{offering}/toggle-status', [CourseOfferingController::class, 'toggleStatus'])->name('course-offerings.toggle-status');
     Route::resource('course-offerings', CourseOfferingController::class);
     
+    // Reglas de Precios (Promociones Grupales)
+    Route::post('course-offerings/{courseOffering}/pricing-rules', [App\Http\Controllers\PricingRuleController::class, 'store'])->name('pricing-rules.store');
+    Route::delete('pricing-rules/{pricingRule}', [App\Http\Controllers\PricingRuleController::class, 'destroy'])->name('pricing-rules.destroy');
+    Route::patch('pricing-rules/{pricingRule}/toggle-status', [App\Http\Controllers\PricingRuleController::class, 'toggleStatus'])->name('pricing-rules.toggle-status');
+    
     // Enrollments
     Route::get('enrollments/pending-approvals', [EnrollmentController::class, 'pendingApprovals'])->name('enrollments.pending-approvals');
     Route::post('enrollments/{enrollment}/approve', [EnrollmentController::class, 'approve'])->name('enrollments.approve');
@@ -167,7 +172,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/{certificateTemplate}', [CertificateTemplateController::class, 'show'])->name('show');
         Route::get('/{certificateTemplate}/edit', [CertificateTemplateController::class, 'edit'])->name('edit');
         Route::put('/{certificateTemplate}', [CertificateTemplateController::class, 'update'])->name('update');
-        Route::delete('/{certificateTemplate}', [CertificateTemplateController::class, 'destroy'])->name('destroy'); // ⚠️ CORREGIDO: era CertificateTemplateTemplate
+        Route::delete('/{certificateTemplate}', [CertificateTemplateController::class, 'destroy'])->name('destroy'); 
         Route::get('/{certificateTemplate}/preview', [CertificateTemplateController::class, 'preview'])->name('preview');
         Route::post('/{certificateTemplate}/duplicate', [CertificateTemplateController::class, 'duplicate'])->name('duplicate');
     });
@@ -181,8 +186,16 @@ Route::middleware('auth')->group(function () {
 
     // Dashboard del Estudiante
     Route::prefix('student-dashboard')->name('student-dashboard.')->group(function () {
-        Route::get('/', [StudentDashboardController::class, 'select'])->name('select');
-        Route::get('/{student}', [StudentDashboardController::class, 'index'])->name('index');
+        // Ruta inteligente (Raíz)
+        Route::get('/', [StudentDashboardController::class, 'root'])->name('root');
+        
+        // Selección de estudiante (Para Admins/Staff o cambio manual)
+        Route::get('/select', [StudentDashboardController::class, 'select'])->name('select');
+        
+        // Vista específica del dashboard de un estudiante
+        Route::get('/view/{student}', [StudentDashboardController::class, 'index'])->name('index');
+        
+        // Acciones del dashboard
         Route::post('/{student}/request-course', [StudentDashboardController::class, 'requestCourse'])->name('request-course');
         Route::post('/{student}/select-meal', [StudentDashboardController::class, 'selectMeal'])->name('select-meal');
     });

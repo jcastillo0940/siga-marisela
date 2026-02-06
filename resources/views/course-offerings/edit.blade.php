@@ -418,6 +418,119 @@
         </div>
     </form>
 
+    <hr class="my-8 border-gray-200">
+
+    <div class="card-premium">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h3 class="text-xl font-display font-bold text-primary-dark">Reglas de Precios Grupales</h3>
+                <p class="text-sm text-gray-500">Configura descuentos automáticos para inscripciones en grupo.</p>
+            </div>
+        </div>
+
+        @if($offering->pricingRules->count() > 0)
+        <div class="overflow-x-auto mb-8">
+            <table class="table-elegant">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Condición</th>
+                        <th>Tipo de Beneficio</th>
+                        <th>Valor</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($offering->pricingRules as $rule)
+                    <tr>
+                        <td class="font-medium">{{ $rule->name ?? 'Sin nombre' }}</td>
+                        <td>
+                            @if($rule->max_students)
+                                De {{ $rule->min_students }} a {{ $rule->max_students }} personas
+                            @else
+                                {{ $rule->min_students }} o más personas
+                            @endif
+                        </td>
+                        <td>
+                            @if($rule->type === 'fixed_total_price')
+                                <span class="badge badge-purple">Precio Total Grupal</span>
+                            @elseif($rule->type === 'percentage')
+                                <span class="badge badge-blue">Descuento Porcentual</span>
+                            @else
+                                <span class="badge badge-green">Descuento Fijo (c/u)</span>
+                            @endif
+                        </td>
+                        <td class="font-bold text-primary-dark">
+                            @if($rule->type === 'percentage')
+                                {{ $rule->value }}% OFF
+                            @else
+                                ${{ number_format($rule->value, 2) }}
+                            @endif
+                        </td>
+                        <td>
+                            <form action="{{ route('pricing-rules.destroy', $rule->id) }}" method="POST" onsubmit="return confirm('¿Eliminar esta regla?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-red-600 hover:text-red-800 text-sm font-semibold">
+                                    Eliminar
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @else
+        <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-8 text-center text-blue-800">
+            No hay reglas de precios configuradas. El precio será siempre <strong>${{ number_format($offering->price, 2) }}</strong> por persona.
+        </div>
+        @endif
+
+        <div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h4 class="font-bold text-lg text-gray-700 mb-4">Agregar Nueva Regla</h4>
+            
+            <form action="{{ route('pricing-rules.store', $offering->id) }}" method="POST">
+                @csrf
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                    
+                    <div class="lg:col-span-1">
+                        <label class="label-elegant text-xs">Nombre (Opcional)</label>
+                        <input type="text" name="name" placeholder="Ej: Parejas" class="input-elegant text-sm">
+                    </div>
+
+                    <div class="lg:col-span-1">
+                        <label class="label-elegant text-xs">Mínimo Personas</label>
+                        <input type="number" name="min_students" min="1" value="2" required class="input-elegant text-sm">
+                    </div>
+                    
+                    <div class="lg:col-span-1">
+                        <label class="label-elegant text-xs">Tipo de Regla</label>
+                        <select name="type" class="input-elegant text-sm" required onchange="updateValueLabel(this)">
+                            <option value="fixed_total_price">Precio Total por Grupo</option>
+                            <option value="percentage">% Descuento Individual</option>
+                            <option value="fixed_discount">$ Descuento Individual</option>
+                        </select>
+                    </div>
+
+                    <div class="lg:col-span-1">
+                        <label class="label-elegant text-xs" id="value-label">Precio Total ($)</label>
+                        <input type="number" step="0.01" name="value" required class="input-elegant text-sm" placeholder="0.00">
+                    </div>
+
+                    <div class="lg:col-span-1">
+                        <button type="submit" class="btn-primary w-full justify-center text-sm py-2.5">
+                            + Agregar Regla
+                        </button>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">
+                    * Si seleccionas "Precio Total por Grupo", el sistema dividirá ese monto entre los integrantes (Ej: $500 / 2 = $250 c/u).
+                </p>
+            </form>
+        </div>
+    </div>
+
     <!-- Delete Form (Hidden) -->
     @if(auth()->user()->hasPermission('courses.delete'))
     <form id="delete-form" 
@@ -536,6 +649,18 @@ function removeClassDate(index) {
     if (element) {
         element.remove();
         updateOfferingDates();
+    }
+}
+
+// Update value label for pricing rules
+function updateValueLabel(select) {
+    const label = document.getElementById('value-label');
+    if (select.value === 'fixed_total_price') {
+        label.textContent = 'Precio Total del Grupo ($)';
+    } else if (select.value === 'percentage') {
+        label.textContent = 'Porcentaje (%)';
+    } else {
+        label.textContent = 'Monto a Descontar ($)';
     }
 }
 

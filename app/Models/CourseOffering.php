@@ -72,6 +72,14 @@ class CourseOffering extends Model
         return $this->hasMany(MealMenu::class);
     }
 
+    /**
+     * Relación con las reglas de precios
+     */
+    public function pricingRules()
+    {
+        return $this->hasMany(PricingRule::class);
+    }
+
     // =========================================================
     // SCOPES (NUEVO - Para el módulo de menús)
     // =========================================================
@@ -186,6 +194,27 @@ class CourseOffering extends Model
         }
         
         return $this->generation_name;
+    }
+
+    /**
+     * Encuentra la mejor regla de precio aplicable para una cantidad de estudiantes.
+     * Prioriza las reglas que requieren más estudiantes (más específicas).
+     */
+    public function getBestPricingRule(int $studentCount): ?PricingRule
+    {
+        return $this->pricingRules()
+            ->where('is_active', true)
+            // La regla debe permitir esta cantidad mínima
+            ->where('min_students', '<=', $studentCount)
+            // Y no debe exceder el máximo (si existe)
+            ->where(function($q) use ($studentCount) {
+                $q->whereNull('max_students')
+                  ->orWhere('max_students', '>=', $studentCount);
+            })
+            // Ordenamos por min_students descendente para agarrar la regla más específica
+            // Ej: Si hay regla para "2+" y "5+", y vienen 6, agarra la de "5+".
+            ->orderByDesc('min_students')
+            ->first();
     }
 
     // Boot method para generar código automático

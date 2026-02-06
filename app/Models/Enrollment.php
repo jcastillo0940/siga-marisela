@@ -16,6 +16,7 @@ class Enrollment extends Model
         'student_id',
         'course_offering_id',
         'enrollment_code',
+        'group_code',
         'enrollment_date',
         'status',
         'price_paid',
@@ -76,6 +77,16 @@ class Enrollment extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * Obtener otras inscripciones que pertenecen al mismo grupo de pago
+     */
+    public function groupMembers()
+    {
+        return $this->hasMany(Enrollment::class, 'group_code', 'group_code')
+            ->where('group_code', '!=', null)
+            ->where('id', '!=', $this->id); // Excluirse a sí mismo
     }
 
     // Accessor para saber si tiene plan de pagos

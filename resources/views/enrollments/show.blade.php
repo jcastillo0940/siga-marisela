@@ -179,14 +179,29 @@
                     </div>
 
                     <div class="md:col-span-2">
-                        <div class="bg-blue-50 border border-blue-200 rounded p-4">
-                            <div class="flex justify-between items-center">
-                                <span class="text-lg font-medium text-primary-dark">Total Pagado:</span>
-                                <span class="text-3xl font-display font-bold text-primary-dark">${{ number_format($enrollment->final_price, 2) }}</span>
-                            </div>
-                        </div>
-                    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-green-50 border border-green-200 rounded p-4">
+            <div class="flex flex-col">
+                <span class="text-sm font-medium text-green-800">Abonado Real:</span>
+                <span class="text-3xl font-display font-bold text-green-700">
+                    ${{ number_format($enrollment->payments->sum('amount'), 2) }}
+                </span>
+            </div>
+        </div>
 
+        <div class="bg-red-50 border border-red-200 rounded p-4">
+            <div class="flex flex-col">
+                <span class="text-sm font-medium text-red-800">Saldo Pendiente:</span>
+                <span class="text-3xl font-display font-bold text-red-700">
+                    ${{ number_format($enrollment->paymentPlan ? $enrollment->paymentPlan->balance : 0, 2) }}
+                </span>
+            </div>
+        </div>
+    </div>
+    <p class="text-right text-xs text-gray-500 mt-2">
+        Costo Total del Curso: ${{ number_format($enrollment->final_price, 2) }}
+    </p>
+</div>
                     <div>
                         <label class="label-elegant">Fecha de Inscripción</label>
                         <p class="text-primary-dark font-medium">{{ $enrollment->enrollment_date->format('d/m/Y') }}</p>

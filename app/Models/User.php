@@ -62,6 +62,10 @@ class User extends Authenticatable
     {
         return $this->roles->whereIn('slug', $roles)->isNotEmpty();
     }
+    public function student()
+    {
+        return $this->hasOne(Student::class);
+    }
 
     // Accessor para saludo con género
     public function getGreetingAttribute(): string

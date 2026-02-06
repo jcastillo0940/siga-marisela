@@ -2,131 +2,220 @@
 
 namespace App\Http\Controllers;
 
-use App\DTOs\Student\CreateStudentDTO;
-use App\DTOs\Student\UpdateStudentDTO;
-use App\Http\Requests\Student\StoreStudentRequest;
-use App\Http\Requests\Student\UpdateStudentRequest;
-use App\Services\StudentService;
+use App\Models\Student;
+use App\Models\MealMenu;
+use App\Models\MealSelection;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
-class StudentController extends Controller
+class StudentDashboardController extends Controller
 {
-    public function __construct(
-        private StudentService $studentService
-    ) {}
-
-    public function index(Request $request)
+    /**
+     * Lógica principal de redirección
+     */
+    public function root()
     {
-        $includeInactive = $request->boolean('include_inactive');
-        $students = $this->studentService->getAllStudents($includeInactive);
+        $user = Auth::user();
 
-        return view('students.index', compact('students', 'includeInactive'));
-    }
-
-    public function create()
-    {
-        return view('students.create');
-    }
-
-    public function store(StoreStudentRequest $request)
-    {
-        DB::beginTransaction();
-
-        try {
-            $dto = CreateStudentDTO::fromRequest($request->validated());
-            $this->studentService->createStudent($dto);
-
-            DB::commit();
-
-            return redirect()
-                ->route('students.index')
-                ->with('success', 'Estudiante creado exitosamente');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return back()
-                ->withInput()
-                ->with('error', 'Error al crear el estudiante: ' . $e->getMessage());
-        }
-    }
-
-    public function show(int $id)
-    {
-        $student = $this->studentService->getStudentById($id);
-
-        if (!$student) {
-            return redirect()
-                ->route('students.index')
-                ->with('error', 'Estudiante no encontrado');
+        if ($user->hasRole('student')) {
+            if ($user->student) {
+                return $this->index($user->student);
+            }
+            abort(403, 'Tu usuario no tiene un perfil de estudiante asociado.');
         }
 
-        return view('students.show', compact('student'));
-    }
-
-    public function edit(int $id)
-    {
-        $student = $this->studentService->getStudentById($id);
-
-        if (!$student) {
-            return redirect()
-                ->route('students.index')
-                ->with('error', 'Estudiante no encontrado');
+        if ($user->hasAnyRole(['super-admin', 'admin', 'staff'])) {
+            return $this->select();
         }
 
-        return view('students.edit', compact('student'));
+        abort(403, 'No tienes permisos para acceder al dashboard de estudiantes.');
     }
 
-    public function update(UpdateStudentRequest $request, int $id)
+    public function select()
     {
-        DB::beginTransaction();
+        $students = Student::where('is_active', true)
+            ->orderBy('first_name')
+            ->get();
 
-        try {
-            $dto = UpdateStudentDTO::fromRequest($request->validated());
-            $this->studentService->updateStudent($id, $dto);
-
-            DB::commit();
-
-            return redirect()
-                ->route('students.show', $id)
-                ->with('success', 'Estudiante actualizado exitosamente');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return back()
-                ->withInput()
-                ->with('error', 'Error al actualizar el estudiante: ' . $e->getMessage());
-        }
+        return view('student-dashboard.select', compact('students'));
     }
 
-    public function destroy(int $id)
+    public function index(Student $student)
     {
-        try {
-            $this->studentService->deleteStudent($id);
+        $user = Auth::user();
 
-            return redirect()
-                ->route('students.index')
-                ->with('success', 'Estudiante eliminado exitosamente');
-
-        } catch (\Exception $e) {
-            return back()
-                ->with('error', 'Error al eliminar el estudiante: ' . $e->getMessage());
+        // Seguridad
+        if ($user->hasRole('student') && $user->student && $user->student->id !== $student->id) {
+            abort(403, 'No estás autorizado para ver este perfil.');
         }
+
+        // Cargar relaciones
+        $student->load([
+            'enrollments' => function ($query) {
+                $query->whereIn('status', ['active', 'completed'])
+                    ->with([
+                        'courseOffering.course',
+                        'courseOffering.sessions',
+                        'paymentPlan.schedules',
+                        'attendances'
+                    ]);
+            },
+            'certificates.course'
+        ]);
+
+        // Estadísticas
+        $stats = [
+            'total_enrollments' => $student->enrollments->where('status', 'active')->count(),
+            'completed_courses' => $student->enrollments->where('status', 'completed')->count(),
+            'total_payments' => $student->enrollments->flatMap->paymentPlan->flatMap->schedules
+                ->where('status', 'paid')->sum('amount'),
+            'pending_balance' => $student->enrollments->flatMap->paymentPlan->sum('balance'),
+            'certificates_count' => $student->certificates->count(),
+        ];
+
+        // Inscripciones activas
+        $activeEnrollments = $student->enrollments->where('status', 'active');
+
+        // --- CORRECCIÓN 1: Próximas sesiones como Colección ---
+        $upcomingSessionsData = [];
+        foreach ($activeEnrollments as $enrollment) {
+            // Filtrar sesiones futuras
+            $sessions = $enrollment->courseOffering->sessions
+                ->where('session_date', '>=', today())
+                ->sortBy('session_date')
+                ->take(3);
+
+            foreach ($sessions as $session) {
+                $upcomingSessionsData[] = [
+                    'enrollment' => $enrollment,
+                    'session' => $session,
+                    'course' => $enrollment->courseOffering->course,
+                ];
+            }
+        }
+        // IMPORTANTE: Convertir a colección para que funcione ->isEmpty()
+        $upcomingSessions = collect($upcomingSessionsData)->sortBy(function ($item) {
+            return $item['session']->session_date;
+        })->take(3);
+
+
+        // Pagos recientes
+        $payments = $student->enrollments->flatMap->paymentPlan->flatMap->schedules
+            ->where('status', 'paid')
+            ->sortByDesc('paid_at')
+            ->take(5);
+
+        // Certificados
+        $certificates = $student->certificates()->with('course')->latest()->get();
+
+        // --- CORRECCIÓN 2: Materiales como Colección ---
+        $materialsData = [];
+        foreach ($activeEnrollments as $enrollment) {
+            if ($enrollment->courseOffering->course->materials) {
+                foreach ($enrollment->courseOffering->course->materials as $material) {
+                    $materialsData[] = [
+                        'material' => $material,
+                        'course' => $enrollment->courseOffering->course,
+                    ];
+                }
+            }
+        }
+        // IMPORTANTE: Convertir a colección
+        $materials = collect($materialsData);
+
+        // Menús disponibles
+        $availableMenus = $this->getAvailableMenusForStudent($student);
+
+        return view('student-dashboard.index', compact(
+            'student',
+            'stats',
+            'activeEnrollments',
+            'upcomingSessions',
+            'payments',
+            'certificates',
+            'materials',
+            'availableMenus'
+        ));
     }
 
-    public function toggleStatus(int $id)
+    public function requestCourse(Request $request, Student $student)
     {
-        try {
-            $this->studentService->toggleStudentStatus($id);
+        return redirect()->route('public.leads.create');
+    }
 
-            return back()
-                ->with('success', 'Estado del estudiante actualizado');
+    public function selectMeal(Request $request, Student $student)
+    {
+        $validated = $request->validate([
+            'meal_menu_id' => 'required|exists:meal_menus,id',
+            'enrollment_id' => 'required|exists:enrollments,id',
+            'meal_option_id' => 'required|exists:meal_options,id',
+            'notes' => 'nullable|string|max:500',
+        ]);
 
-        } catch (\Exception $e) {
-            return back()
-                ->with('error', 'Error al cambiar el estado: ' . $e->getMessage());
+        $enrollment = $student->enrollments()->find($validated['enrollment_id']);
+        
+        if (!$enrollment) {
+            return back()->with('error', 'Inscripción no encontrada');
         }
+
+        $mealMenu = MealMenu::find($validated['meal_menu_id']);
+        
+        if ($mealMenu->course_offering_id !== $enrollment->course_offering_id) {
+            return back()->with('error', 'Este menú no corresponde a tu curso');
+        }
+
+        $option = $mealMenu->options()
+            ->where('id', $validated['meal_option_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (!$option) {
+            return back()->with('error', 'Opción de menú no disponible');
+        }
+
+        if ($option->available_quantity !== null && $option->remaining_quantity <= 0) {
+            return back()->with('error', 'Esta opción ya no está disponible');
+        }
+
+        MealSelection::updateOrCreate(
+            [
+                'enrollment_id' => $enrollment->id,
+                'meal_menu_id' => $mealMenu->id,
+            ],
+            [
+                'meal_option_id' => $validated['meal_option_id'],
+                'notes' => $validated['notes'] ?? null,
+            ]
+        );
+
+        return back()->with('success', '¡Selección de menú guardada exitosamente!');
+    }
+
+    private function getAvailableMenusForStudent(Student $student)
+    {
+        $activeEnrollments = $student->enrollments()->where('status', 'active')->get();
+        $courseOfferingIds = $activeEnrollments->pluck('course_offering_id');
+
+        $menus = MealMenu::whereIn('course_offering_id', $courseOfferingIds)
+            ->where('is_active', true)
+            ->where('meal_date', '>=', today())
+            ->with(['courseOffering.course', 'options'])
+            ->orderBy('meal_date', 'asc')
+            ->get();
+
+        $availableMenus = [];
+        foreach ($menus as $menu) {
+            $enrollment = $activeEnrollments->firstWhere('course_offering_id', $menu->course_offering_id);
+            
+            if ($enrollment) {
+                $availableMenus[] = [
+                    'menu' => $menu,
+                    'enrollment' => $enrollment,
+                    'course' => $enrollment->courseOffering->course,
+                ];
+            }
+        }
+
+        return collect($availableMenus);
     }
 }
