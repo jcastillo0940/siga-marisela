@@ -42,7 +42,8 @@ class Enrollment extends Model
         'approved_at' => 'datetime',
     ];
 
-    // Relaciones
+    // ==================== RELACIONES ====================
+    
     public function student(): BelongsTo
     {
         return $this->belongsTo(Student::class);
@@ -63,7 +64,6 @@ class Enrollment extends Model
         return $this->hasMany(Payment::class);
     }
 
-    // NUEVAS RELACIONES - ASISTENCIA Y CERTIFICADOS
     public function attendances(): HasMany
     {
         return $this->hasMany(Attendance::class);
@@ -86,16 +86,16 @@ class Enrollment extends Model
     {
         return $this->hasMany(Enrollment::class, 'group_code', 'group_code')
             ->where('group_code', '!=', null)
-            ->where('id', '!=', $this->id); // Excluirse a sí mismo
+            ->where('id', '!=', $this->id);
     }
 
-    // Accessor para saber si tiene plan de pagos
+    // ==================== ACCESSORS ====================
+    
     public function getHasPaymentPlanAttribute(): bool
     {
         return $this->paymentPlan()->exists();
     }
 
-    // Accessor para obtener balance de pagos
     public function getPaymentBalanceAttribute(): float
     {
         if (!$this->has_payment_plan) {
@@ -104,13 +104,11 @@ class Enrollment extends Model
         return $this->paymentPlan->balance;
     }
 
-    // Accessor para acceder al curso base
     public function getCourseAttribute()
     {
         return $this->courseOffering->course;
     }
 
-    // Accessors
     public function getFinalPriceAttribute(): float
     {
         return $this->price_paid - $this->discount;
@@ -118,13 +116,14 @@ class Enrollment extends Model
 
     public function getIsActiveAttribute(): bool
     {
-        return in_array($this->status, ['inscrito', 'en_curso']);
+        return in_array($this->status, ['active', 'inscrito', 'en_curso']);
     }
 
-    // NUEVOS ACCESSORS - ASISTENCIA
+    // ACCESSORS DE ASISTENCIA
+    
     public function getAttendancePercentageAttribute(): float
     {
-        $totalSessions = $this->courseOffering->courseSessions()->count();
+        $totalSessions = $this->courseOffering->sessions()->count();
         
         if ($totalSessions === 0) {
             return 0;
@@ -146,9 +145,11 @@ class Enrollment extends Model
 
     public function getTotalSessionsAttribute(): int
     {
-        return $this->courseOffering->courseSessions()->count();
+        return $this->courseOffering->sessions()->count();
     }
 
+    // ACCESSORS DE PAGOS
+    
     public function getIsFullyPaidAttribute(): bool
     {
         if (!$this->has_payment_plan) {
@@ -162,7 +163,13 @@ class Enrollment extends Model
         return $this->payment_balance;
     }
 
-    // ACCESSORS PARA APROBACIÓN
+    public function getTotalPaidAttribute(): float
+    {
+        return $this->payments()->sum('amount');
+    }
+
+    // ACCESSORS DE APROBACIÓN
+    
     public function getApprovalStatusAttribute(): string
     {
         if (!$this->requires_approval) {
@@ -193,7 +200,8 @@ class Enrollment extends Model
         return $this->requires_approval && $this->management_approved === null;
     }
 
-    // Boot method para generar código automático
+    // ==================== BOOT ====================
+    
     protected static function boot()
     {
         parent::boot();

@@ -16,7 +16,9 @@
                         ¡Bienvenido, {{ $student->first_name }}!
                     </h1>
                     <p class="text-gray-600 mt-1">{{ $student->email }}</p>
-                    <p class="text-sm text-gray-500">ID: {{ $student->identification }}</p>
+                    @if($student->identification)
+                        <p class="text-sm text-gray-500">ID: {{ $student->identification }}</p>
+                    @endif
                 </div>
             </div>
             
@@ -224,6 +226,40 @@
                 </div>
                 @endif
             </div>
+
+            {{-- NUEVA SECCIÓN: Historial de Cursos Anteriores --}}
+            @if(!$pastEnrollments->isEmpty())
+            <div class="card-premium">
+                <h3 class="text-xl font-display font-semibold text-gray-700 mb-4 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Historial de Cursos Anteriores
+                </h3>
+
+                <div class="space-y-3">
+                    @foreach($pastEnrollments as $past)
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex-1">
+                            <h4 class="font-medium text-gray-800">{{ $past->courseOffering->course->name }}</h4>
+                            <p class="text-xs text-gray-500">Finalizado: {{ $past->updated_at->format('d/m/Y') }}</p>
+                            @if($past->paymentPlan)
+                            <p class="text-xs text-gray-600 mt-1">
+                                Pagado: ${{ number_format($past->total_paid, 2) }}
+                                @if($past->paymentPlan->balance > 0)
+                                    <span class="text-red-600 font-semibold">(Saldo: ${{ number_format($past->paymentPlan->balance, 2) }})</span>
+                                @endif
+                            </p>
+                            @endif
+                        </div>
+                        <span class="px-3 py-1 text-xs font-bold rounded {{ $past->status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700' }}">
+                            {{ $past->status === 'completed' ? 'Completado' : 'Cancelado' }}
+                        </span>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
 
             <div class="card-premium">
                 <h3 class="text-xl font-display font-semibold text-primary-dark mb-4 flex items-center">

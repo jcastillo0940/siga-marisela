@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -38,7 +37,7 @@ class Course extends Model
     ];
 
     // --- Relaciones ---
-
+    
     /**
      * Relación con las ofertas del curso.
      */
@@ -71,20 +70,32 @@ class Course extends Model
         );
     }
 
+    /**
+     * Relación con certificados del curso.
+     */
     public function certificates(): HasMany
     {
         return $this->hasMany(Certificate::class);
     }
 
-    // --- Scopes ---
+    /**
+     * Relación con materiales del curso.
+     * Agregar esta relación para el dashboard de estudiantes.
+     */
+    public function materials(): HasMany
+    {
+        return $this->hasMany(CourseMaterial::class, 'course_offering_id');
+    }
 
+    // --- Scopes ---
+    
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
     // --- Accessors ---
-
+    
     public function getFormattedPriceAttribute(): string
     {
         return '$' . number_format($this->price, 2);

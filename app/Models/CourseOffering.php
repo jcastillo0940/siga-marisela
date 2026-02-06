@@ -38,15 +38,34 @@ class CourseOffering extends Model
         'is_active' => 'boolean',
     ];
 
-    // Relaciones
+    // =========================================================
+    // RELACIONES
+    // =========================================================
+
     public function course()
     {
         return $this->belongsTo(Course::class);
     }
 
+    /**
+     * Relación corregida con materiales.
+     * Forzamos 'course_offering_id' para evitar error de columna 'course_id' inexistente.
+     */
+    public function materials(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CourseMaterial::class, 'course_offering_id');
+    }
+
+    /**
+     * ALIAS CRÍTICO: Define la relación 'sessions' que el controlador intenta cargar.
+     */
+    public function sessions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CourseOfferingDate::class, 'course_offering_id')->orderBy('class_date');
+    }
+
     public function dates()
     {
-        // Importante: Ordenamos por class_date para que el .first() sea siempre la Clase #1
         return $this->hasMany(CourseOfferingDate::class)->orderBy('class_date');
     }
 
@@ -72,52 +91,40 @@ class CourseOffering extends Model
         return $this->hasMany(MealMenu::class);
     }
 
-    /**
-     * Relación con las reglas de precios
-     */
     public function pricingRules()
     {
         return $this->hasMany(PricingRule::class);
     }
 
     // =========================================================
-    // SCOPES (NUEVO - Para el módulo de menús)
+    // SCOPES
     // =========================================================
     
-    /**
-     * Scope para obtener solo course offerings activos
-     */
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    /**
-     * Scope para obtener course offerings próximos (que no han terminado)
-     */
     public function scopeUpcoming($query)
     {
         return $query->where('end_date', '>=', today());
     }
 
-    /**
-     * Scope para obtener course offerings en progreso
-     */
     public function scopeInProgress($query)
     {
         return $query->where('start_date', '<=', today())
             ->where('end_date', '>=', today());
     }
 
-    /**
-     * Scope para filtrar por estado
-     */
     public function scopeByStatus($query, $status)
     {
         return $query->where('status', $status);
     }
 
-    // Accessors Existentes
+    // =========================================================
+    // ACCESSORS
+    // =========================================================
+
     public function getFormattedPriceAttribute(): string
     {
         return '$' . number_format($this->price, 2);
@@ -142,86 +149,53 @@ class CourseOffering extends Model
         return $name;
     }
 
-    // =========================================================
-    // NUEVOS ACCESSORS PARA HORARIO REAL (CLASE #1)
-    // =========================================================
-
-    /**
-     * Obtiene la hora de la primera clase en formato limpio (9am o 10:30am)
-     */
     public function getStartTimeFriendlyAttribute(): string
     {
         $firstSession = $this->dates->first();
-        
-        // Si no hay clases creadas, devolvemos un texto informativo
         if (!$firstSession || !$firstSession->start_time) {
             return 'Hora por definir';
         }
-
         $time = Carbon::parse($firstSession->start_time);
-        // Formato: si minutos son 00 muestra "9am", si no "9:30am"
         return $time->minute > 0 ? $time->format('g:ia') : $time->format('ga');
     }
 
-    /**
-     * Genera la etiqueta completa para el selector público
-     * Ejemplo: Hotel Sheraton — 17 Jan a las 9am
-     */
     public function getPublicScheduleLabelAttribute(): string
     {
         $firstSession = $this->dates->first();
         $dateRaw = $firstSession ? $firstSession->class_date : $this->start_date;
-        
         $fecha = Carbon::parse($dateRaw)->translatedFormat('d M');
         $hora = $this->start_time_friendly;
-
         return "{$this->location} — {$fecha} a las {$hora}";
     }
 
-    /**
-     * Accessor para generation_number (compatibilidad con vistas)
-     * Extrae el número de generación desde generation_name
-     */
     public function getGenerationNumberAttribute(): ?string
     {
-        if (!$this->generation_name) {
-            return null;
-        }
-        
-        // Si generation_name es "Gen 19" o "Generación 19", extrae "19"
+        if (!$this->generation_name) return null;
         if (preg_match('/(\d+)/', $this->generation_name, $matches)) {
             return $matches[1];
         }
-        
         return $this->generation_name;
     }
 
-    /**
-     * Encuentra la mejor regla de precio aplicable para una cantidad de estudiantes.
-     * Prioriza las reglas que requieren más estudiantes (más específicas).
-     */
+    // =========================================================
+    // LÓGICA DE NEGOCIO
+    // =========================================================
+
     public function getBestPricingRule(int $studentCount): ?PricingRule
     {
         return $this->pricingRules()
             ->where('is_active', true)
-            // La regla debe permitir esta cantidad mínima
             ->where('min_students', '<=', $studentCount)
-            // Y no debe exceder el máximo (si existe)
             ->where(function($q) use ($studentCount) {
-                $q->whereNull('max_students')
-                  ->orWhere('max_students', '>=', $studentCount);
+                $q->whereNull('max_students')->orWhere('max_students', '>=', $studentCount);
             })
-            // Ordenamos por min_students descendente para agarrar la regla más específica
-            // Ej: Si hay regla para "2+" y "5+", y vienen 6, agarra la de "5+".
             ->orderByDesc('min_students')
             ->first();
     }
 
-    // Boot method para generar código automático
     protected static function boot()
     {
         parent::boot();
-
         static::creating(function ($offering) {
             if (empty($offering->code)) {
                 $offering->code = 'OFF-' . strtoupper(uniqid());
