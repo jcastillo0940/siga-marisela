@@ -33,19 +33,22 @@ class EnrollmentService
         ])->find($id);
     }
 
+    /**
+     * Crea una inscripción y sincroniza automáticamente el Plan de Pagos
+     */
     public function createEnrollment(
         CreateEnrollmentDTO $dto,
         array $paymentPlanData = []
     ): Enrollment {
         return DB::transaction(function () use ($dto, $paymentPlanData) {
-            // Verificar disponibilidad de cupos
+            // 1. Verificar disponibilidad de cupos
             $offering = CourseOffering::findOrFail($dto->course_offering_id);
 
             if ($offering->available_spots <= 0) {
                 throw new \Exception('No hay cupos disponibles para este curso.');
             }
 
-            // Verificar si el estudiante ya está inscrito
+            // 2. Verificar si el estudiante ya está inscrito
             $exists = Enrollment::where('student_id', $dto->student_id)
                                ->where('course_offering_id', $dto->course_offering_id)
                                ->exists();
@@ -54,21 +57,26 @@ class EnrollmentService
                 throw new \Exception('El estudiante ya está inscrito en este curso.');
             }
 
-            // Verificar choque de horarios con otros cursos activos
+            // 3. Verificar choque de horarios con otros cursos activos
             $this->checkScheduleConflicts($dto->student_id, $offering);
 
-            // Crear inscripción
+            // 4. Crear inscripción
             $enrollment = Enrollment::create($dto->toArray());
 
-            // Crear plan de pagos si se proporcionan datos
+            // 5. Crear plan de pagos sincronizado
             if (!empty($paymentPlanData)) {
                 $paymentType = $paymentPlanData['payment_type'] ?? 'contado';
-                $totalAmount = $paymentPlanData['total_amount'] ?? $dto->price_paid;
                 $amountPaid = $paymentPlanData['amount_paid'] ?? 0;
+                
+                /**
+                 * REGLA DE CONSISTENCIA: 
+                 * El monto total del plan de pagos DEBE ser el final_price de la inscripción.
+                 * Esto evita que el total diga $350 y el saldo se calcule sobre $300.
+                 */
+                $totalAmount = $enrollment->final_price; 
                 
                 // Determinar si es pago completo o tiene plan de cuotas
                 if ($paymentType === 'contado' || $amountPaid >= $totalAmount) {
-                    // Pago completo - crear plan sin cuotas pendientes
                     $this->paymentPlanService->createPaymentPlan(
                         enrollmentId: $enrollment->id,
                         paymentType: 'contado',
@@ -78,14 +86,13 @@ class EnrollmentService
                         numberOfInstallments: null
                     );
                 } else {
-                    // Pago parcial - crear plan con cuotas
                     $this->paymentPlanService->createPaymentPlan(
                         enrollmentId: $enrollment->id,
                         paymentType: 'cuotas',
                         totalAmount: $totalAmount,
                         amountPaid: $amountPaid,
-                        periodicity: $paymentPlanData['periodicity'] ?? null,
-                        numberOfInstallments: $paymentPlanData['number_of_installments'] ?? null
+                        periodicity: $paymentPlanData['periodicity'] ?? 'mensual',
+                        numberOfInstallments: $paymentPlanData['number_of_installments'] ?? 1
                     );
                 }
             }
@@ -99,6 +106,16 @@ class EnrollmentService
         return DB::transaction(function () use ($id, $dto) {
             $enrollment = Enrollment::findOrFail($id);
             $enrollment->update($dto->toArray());
+
+            /**
+             * OPCIONAL: Si cambias el precio o descuento en el Update, 
+             * deberías llamar a $enrollment->paymentPlan->updateBalance() 
+             * para resincronizar los montos.
+             */
+            if ($enrollment->paymentPlan) {
+                $enrollment->paymentPlan->updateBalance();
+            }
+
             return $enrollment->fresh(['student', 'courseOffering.course']);
         });
     }
@@ -132,14 +149,8 @@ class EnrollmentService
         });
     }
 
-    /**
-     * Verifica si hay choque de horarios entre el curso nuevo y los cursos activos del estudiante
-     *
-     * @throws \Exception si hay conflicto de horarios
-     */
     private function checkScheduleConflicts(int $studentId, CourseOffering $newOffering): void
     {
-        // Obtener inscripciones activas del estudiante
         $activeEnrollments = Enrollment::where('student_id', $studentId)
             ->whereIn('status', ['inscrito', 'en_curso'])
             ->with(['courseOffering.dates', 'courseOffering.course'])
@@ -149,7 +160,6 @@ class EnrollmentService
             return;
         }
 
-        // Cargar las fechas del curso nuevo
         $newOffering->load('dates', 'course');
         $newDates = $newOffering->dates()->where('is_cancelled', false)->get();
 
@@ -157,36 +167,23 @@ class EnrollmentService
             return;
         }
 
-        // Verificar conflictos con cada curso activo
         foreach ($activeEnrollments as $enrollment) {
             $existingDates = $enrollment->courseOffering->dates()
                 ->where('is_cancelled', false)
                 ->get();
 
-            if ($existingDates->isEmpty()) {
-                continue;
-            }
-
-            // Comparar cada fecha del curso nuevo con las fechas existentes
             foreach ($newDates as $newDate) {
                 foreach ($existingDates as $existingDate) {
-                    // Verificar si es el mismo día
                     if ($newDate->class_date->isSameDay($existingDate->class_date)) {
-                        // Verificar si hay overlap de horarios
                         if ($this->hasTimeOverlap(
                             $newDate->start_time,
                             $newDate->end_time,
                             $existingDate->start_time,
                             $existingDate->end_time
                         )) {
-                            $conflictCourse = $enrollment->courseOffering->full_name;
-                            $conflictDate = $existingDate->class_date->format('d/m/Y');
-                            $conflictTime = $existingDate->start_time . ' - ' . $existingDate->end_time;
-
                             throw new \Exception(
-                                "Conflicto de horario detectado: El estudiante ya tiene inscripción en '{$conflictCourse}' " .
-                                "el día {$conflictDate} de {$conflictTime}. " .
-                                "No puede inscribirse en dos cursos con horarios que se cruzan."
+                                "Conflicto de horario: El estudiante ya tiene '{$enrollment->courseOffering->full_name}' " .
+                                "el {$existingDate->class_date->format('d/m/Y')} a las {$existingDate->start_time}."
                             );
                         }
                     }
@@ -195,14 +192,9 @@ class EnrollmentService
         }
     }
 
-    /**
-     * Verifica si dos rangos de tiempo se superponen
-     */
     private function hasTimeOverlap(?string $start1, ?string $end1, ?string $start2, ?string $end2): bool
     {
-        if (!$start1 || !$end1 || !$start2 || !$end2) {
-            return false;
-        }
+        if (!$start1 || !$end1 || !$start2 || !$end2) return false;
 
         $start1Carbon = \Carbon\Carbon::createFromFormat('H:i:s', $start1);
         $end1Carbon = \Carbon\Carbon::createFromFormat('H:i:s', $end1);

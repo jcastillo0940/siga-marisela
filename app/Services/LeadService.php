@@ -7,9 +7,12 @@ use App\DTOs\Lead\UpdateLeadDTO;
 use App\Models\Lead;
 use App\Models\Student;
 use App\Models\Enrollment;
+use App\Models\User;
+use App\Models\Role;
 use App\DTOs\Enrollment\CreateEnrollmentDTO;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class LeadService
 {
@@ -72,7 +75,7 @@ class LeadService
 
     /**
      * Convierte un Lead en Estudiante e Inscripción. 
-     * Ahora incluye soporte completo para plan de pagos.
+     * Ahora incluye soporte completo para plan de pagos y creación de usuario.
      */
     public function convertToStudent(int $leadId, array $additionalData = []): Student
     {
@@ -113,6 +116,50 @@ class LeadService
                 ]);
             }
 
+            // 1.5 Crear Usuario Automáticamente si no tiene
+            if (!$student->user_id) {
+                // Verificar si ya existe un usuario con este email
+                $existingUser = User::where('email', $student->email)->first();
+
+                if ($existingUser) {
+                    // Si existe el usuario por email, vinculamos
+                    $student->update(['user_id' => $existingUser->id]);
+                    
+                    // Asegurar rol de estudiante
+                    $studentRole = Role::where('slug', 'student')->first();
+                    if ($studentRole && !$existingUser->hasRole('student')) {
+                        $existingUser->roles()->attach($studentRole->id);
+                    }
+                } else {
+                    // Crear nuevo usuario
+                    // Contraseña: Fecha nacimiento (dmY) o por defecto 12345678
+                    $passwordRaw = '12345678';
+                    if (!empty($lead->birth_date_text)) {
+                        try {
+                            $passwordRaw = Carbon::parse($lead->birth_date_text)->format('dmY');
+                        } catch (\Exception $e) {
+                            // Fallback si la fecha no es parseable
+                        }
+                    }
+
+                    $newUser = User::create([
+                        'name' => $lead->first_name . ' ' . $lead->last_name,
+                        'email' => $lead->email,
+                        'password' => bcrypt($passwordRaw),
+                        'is_active' => true,
+                    ]);
+
+                    // Asignar rol
+                    $studentRole = Role::where('slug', 'student')->first();
+                    if ($studentRole) {
+                        $newUser->roles()->attach($studentRole->id);
+                    }
+
+                    // Vincular al estudiante
+                    $student->update(['user_id' => $newUser->id]);
+                }
+            }
+
             // 2. Crear inscripción si el lead tiene una oferta de curso
             if ($lead->course_offering_id) {
                 
@@ -145,7 +192,10 @@ class LeadService
                         $numberOfInstallments = $additionalData['number_of_installments'] ?? null;
                         
                         if (!$periodicity || !$numberOfInstallments) {
-                            throw new \Exception('Se requiere periodicidad y número de cuotas para pagos parciales.');
+                             // Fallback valores por defecto si faltan datos en conversión automática
+                             $paymentType = 'cuotas';
+                             $periodicity = 'monthly'; 
+                             $numberOfInstallments = 1; 
                         }
                     }
                     

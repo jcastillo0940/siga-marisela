@@ -2,220 +2,130 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use App\Models\Student;
-use App\Models\MealMenu;
-use App\Models\MealSelection;
+use App\Services\StudentService;
+use App\DTOs\Student\CreateStudentDTO;
+use App\DTOs\Student\UpdateStudentDTO;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
-class StudentDashboardController extends Controller
+class StudentController extends Controller
 {
+    protected $studentService;
+
+    public function __construct(StudentService $studentService)
+    {
+        $this->studentService = $studentService;
+    }
+
     /**
-     * Lógica principal de redirección
+     * Muestra la lista de estudiantes.
      */
-    public function root()
+    public function index(Request $request)
     {
-        $user = Auth::user();
+        $includeInactive = $request->has('include_inactive');
+        $students = $this->studentService->getAllStudents($includeInactive);
 
-        if ($user->hasRole('student')) {
-            if ($user->student) {
-                return $this->index($user->student);
-            }
-            abort(403, 'Tu usuario no tiene un perfil de estudiante asociado.');
-        }
-
-        if ($user->hasAnyRole(['super-admin', 'admin', 'staff'])) {
-            return $this->select();
-        }
-
-        abort(403, 'No tienes permisos para acceder al dashboard de estudiantes.');
+        return view('students.index', compact('students', 'includeInactive'));
     }
 
-    public function select()
+    /**
+     * Formulario para crear nuevo estudiante.
+     */
+    public function create()
     {
-        $students = Student::where('is_active', true)
-            ->orderBy('first_name')
-            ->get();
-
-        return view('student-dashboard.select', compact('students'));
+        return view('students.create');
     }
 
-    public function index(Student $student)
-    {
-        $user = Auth::user();
-
-        // Seguridad
-        if ($user->hasRole('student') && $user->student && $user->student->id !== $student->id) {
-            abort(403, 'No estás autorizado para ver este perfil.');
-        }
-
-        // Cargar relaciones
-        $student->load([
-            'enrollments' => function ($query) {
-                $query->whereIn('status', ['active', 'completed'])
-                    ->with([
-                        'courseOffering.course',
-                        'courseOffering.sessions',
-                        'paymentPlan.schedules',
-                        'attendances'
-                    ]);
-            },
-            'certificates.course'
-        ]);
-
-        // Estadísticas
-        $stats = [
-            'total_enrollments' => $student->enrollments->where('status', 'active')->count(),
-            'completed_courses' => $student->enrollments->where('status', 'completed')->count(),
-            'total_payments' => $student->enrollments->flatMap->paymentPlan->flatMap->schedules
-                ->where('status', 'paid')->sum('amount'),
-            'pending_balance' => $student->enrollments->flatMap->paymentPlan->sum('balance'),
-            'certificates_count' => $student->certificates->count(),
-        ];
-
-        // Inscripciones activas
-        $activeEnrollments = $student->enrollments->where('status', 'active');
-
-        // --- CORRECCIÓN 1: Próximas sesiones como Colección ---
-        $upcomingSessionsData = [];
-        foreach ($activeEnrollments as $enrollment) {
-            // Filtrar sesiones futuras
-            $sessions = $enrollment->courseOffering->sessions
-                ->where('session_date', '>=', today())
-                ->sortBy('session_date')
-                ->take(3);
-
-            foreach ($sessions as $session) {
-                $upcomingSessionsData[] = [
-                    'enrollment' => $enrollment,
-                    'session' => $session,
-                    'course' => $enrollment->courseOffering->course,
-                ];
-            }
-        }
-        // IMPORTANTE: Convertir a colección para que funcione ->isEmpty()
-        $upcomingSessions = collect($upcomingSessionsData)->sortBy(function ($item) {
-            return $item['session']->session_date;
-        })->take(3);
-
-
-        // Pagos recientes
-        $payments = $student->enrollments->flatMap->paymentPlan->flatMap->schedules
-            ->where('status', 'paid')
-            ->sortByDesc('paid_at')
-            ->take(5);
-
-        // Certificados
-        $certificates = $student->certificates()->with('course')->latest()->get();
-
-        // --- CORRECCIÓN 2: Materiales como Colección ---
-        $materialsData = [];
-        foreach ($activeEnrollments as $enrollment) {
-            if ($enrollment->courseOffering->course->materials) {
-                foreach ($enrollment->courseOffering->course->materials as $material) {
-                    $materialsData[] = [
-                        'material' => $material,
-                        'course' => $enrollment->courseOffering->course,
-                    ];
-                }
-            }
-        }
-        // IMPORTANTE: Convertir a colección
-        $materials = collect($materialsData);
-
-        // Menús disponibles
-        $availableMenus = $this->getAvailableMenusForStudent($student);
-
-        return view('student-dashboard.index', compact(
-            'student',
-            'stats',
-            'activeEnrollments',
-            'upcomingSessions',
-            'payments',
-            'certificates',
-            'materials',
-            'availableMenus'
-        ));
-    }
-
-    public function requestCourse(Request $request, Student $student)
-    {
-        return redirect()->route('public.leads.create');
-    }
-
-    public function selectMeal(Request $request, Student $student)
+    /**
+     * Almacena el estudiante usando el CreateStudentDTO.
+     */
+    public function store(Request $request)
     {
         $validated = $request->validate([
-            'meal_menu_id' => 'required|exists:meal_menus,id',
-            'enrollment_id' => 'required|exists:enrollments,id',
-            'meal_option_id' => 'required|exists:meal_options,id',
-            'notes' => 'nullable|string|max:500',
+            'first_name' => 'required|string|max:255',
+            'last_name'  => 'required|string|max:255',
+            'email'      => 'required|email|unique:students,email',
+            'gender'     => 'required|in:male,female,other',
+            'status'     => 'required|string',
+            // Agrega aquí el resto de validaciones si lo deseas
         ]);
 
-        $enrollment = $student->enrollments()->find($validated['enrollment_id']);
-        
-        if (!$enrollment) {
-            return back()->with('error', 'Inscripción no encontrada');
-        }
+        // Aseguramos el valor booleano para is_active
+        $validated['is_active'] = $request->has('is_active');
 
-        $mealMenu = MealMenu::find($validated['meal_menu_id']);
-        
-        if ($mealMenu->course_offering_id !== $enrollment->course_offering_id) {
-            return back()->with('error', 'Este menú no corresponde a tu curso');
-        }
+        $dto = CreateStudentDTO::fromRequest(array_merge($request->all(), $validated));
+        $this->studentService->createStudent($dto);
 
-        $option = $mealMenu->options()
-            ->where('id', $validated['meal_option_id'])
-            ->where('is_active', true)
-            ->first();
-
-        if (!$option) {
-            return back()->with('error', 'Opción de menú no disponible');
-        }
-
-        if ($option->available_quantity !== null && $option->remaining_quantity <= 0) {
-            return back()->with('error', 'Esta opción ya no está disponible');
-        }
-
-        MealSelection::updateOrCreate(
-            [
-                'enrollment_id' => $enrollment->id,
-                'meal_menu_id' => $mealMenu->id,
-            ],
-            [
-                'meal_option_id' => $validated['meal_option_id'],
-                'notes' => $validated['notes'] ?? null,
-            ]
-        );
-
-        return back()->with('success', '¡Selección de menú guardada exitosamente!');
+        return redirect()->route('students.index')
+                         ->with('success', 'Estudiante creado exitosamente.');
     }
 
-    private function getAvailableMenusForStudent(Student $student)
+    /**
+     * Muestra los detalles de un estudiante.
+     */
+    public function show($id)
     {
-        $activeEnrollments = $student->enrollments()->where('status', 'active')->get();
-        $courseOfferingIds = $activeEnrollments->pluck('course_offering_id');
+        $student = $this->studentService->getStudentById($id);
 
-        $menus = MealMenu::whereIn('course_offering_id', $courseOfferingIds)
-            ->where('is_active', true)
-            ->where('meal_date', '>=', today())
-            ->with(['courseOffering.course', 'options'])
-            ->orderBy('meal_date', 'asc')
-            ->get();
-
-        $availableMenus = [];
-        foreach ($menus as $menu) {
-            $enrollment = $activeEnrollments->firstWhere('course_offering_id', $menu->course_offering_id);
-            
-            if ($enrollment) {
-                $availableMenus[] = [
-                    'menu' => $menu,
-                    'enrollment' => $enrollment,
-                    'course' => $enrollment->courseOffering->course,
-                ];
-            }
+        if (!$student) {
+            abort(404);
         }
 
-        return collect($availableMenus);
+        return view('students.show', compact('student'));
+    }
+
+    /**
+     * Formulario para editar.
+     */
+    public function edit($id)
+    {
+        $student = Student::findOrFail($id);
+        return view('students.edit', compact('student'));
+    }
+
+    /**
+     * Actualiza el estudiante usando el UpdateStudentDTO.
+     */
+    public function update(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name'  => 'required|string|max:255',
+            'email'      => 'required|email|unique:students,email,' . $id,
+            'gender'     => 'required|in:male,female,other',
+            'status'     => 'required|string',
+        ]);
+
+        // Manejo del checkbox
+        $data = $request->all();
+        $data['is_active'] = $request->has('is_active');
+
+        $dto = UpdateStudentDTO::fromRequest($data);
+        $this->studentService->updateStudent($id, $dto);
+
+        return redirect()->route('students.show', $id)
+                         ->with('success', 'Estudiante actualizado correctamente.');
+    }
+
+    /**
+     * Elimina el estudiante (Soft Delete).
+     */
+    public function destroy($id)
+    {
+        $this->studentService->deleteStudent($id);
+
+        return redirect()->route('students.index')
+                         ->with('success', 'Estudiante eliminado correctamente.');
+    }
+
+    /**
+     * Alterna el estado activo/inactivo.
+     */
+    public function toggleStatus($id)
+    {
+        $this->studentService->toggleStudentStatus($id);
+
+        return back()->with('success', 'Estado del estudiante actualizado.');
     }
 }
